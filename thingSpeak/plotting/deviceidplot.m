@@ -9,7 +9,7 @@
 readChannelID = [786238];
 % TODO - Replace the [] with the Field ID to read data from:
 fieldID1 = [1];
-fieldID1 = [2];
+fieldID2 = [2];
 
 % Channel Read API Key 
 % If your channel is private, then enter the read API
