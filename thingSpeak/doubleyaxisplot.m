@@ -57,5 +57,4 @@ ylabel ('Current (mA)');
 ylim([0 3000])
 plot(time, data3, 'r');
 
-datetick('x', 'dd-mmm-yyyy HH:MM:SS')
 legend({'VRect','VCap', 'Current'}, 'Location' , 'northwest');
