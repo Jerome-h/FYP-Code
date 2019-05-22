@@ -1,4 +1,4 @@
- %Checks period of time between now and last time of charge for each device. If this exceeds 
+%Checks period of time between now and last time of charge for each device. If this exceeds 
 %a user specified threshold, then it will send a command to TalkBack app, using the ID as the command
 
 %User Specified Values
@@ -34,6 +34,7 @@ time = datetime(t,'InputFormat','dd-MMM-yyyy HH:mm:ss'); %Converts to datetime a
 
 %% Analysis of Data %%
 
+%For loop to cycle through device IDs
 for i = 1:devices
     deviceflag = false; %Flags if Device ID is within sample set
     
@@ -41,21 +42,26 @@ for i = 1:devices
     url =  strcat('https://api.thingspeak.com/talkbacks/',TalkBack_ID,'/commands.json');
     options = weboptions('RequestMethod','post');
     
-    for j = samples:-1:1 %Decrementing for loop to compare latest received samples
+    %Decrementing for loop to cycle through latest received samples
+    for j = samples:-1:1 
         disp(time(j));
+        
+        %Checks if sample's ID corresponds to ID of current iteration
         if IDdata(j) == i
             timenow = datetime('now');
-            duration = timenow - time(j); %Calculates time difference between timestamp and now
+            duration = timenow - time(j); %Calculates time difference between sample's timestamp and now
             duration.Format = 'h'; %Converts the duration into number of hours
             disp(duration);
             deviceflag = true; % Device ID present in sample set
+            
+          %Compares if duration has exceeded user specified threshold
           if duration > threshold
             disp('Duration for device ' + string(i) + ' exceeds threshold');
             disp("Updating TalkBack App with command to charge ID ...") ;
-            
-            %Sends a command to the TalkBack app. Command is ID of device
+            %Sends a command to the TalkBack app. Command string is ID of device
             data = webread(url,'api_key',TalkBack_apikey,'command_string',i,options)
           end
+          %Breaks when sample's ID corresponds to the ID of the current iteration
           break;
         end 
     end
