@@ -31,4 +31,4 @@ time = datetime(t,'InputFormat','dd-MMM-yyyy HH:mm:ss'); %Converts to datetime a
 title('Device State of Charge');
 xlabel  ('Time');
 ylabel  ('Device ID');
-stairs(time, data);
+stairs(time, data , '*');
