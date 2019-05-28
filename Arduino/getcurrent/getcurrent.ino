@@ -74,6 +74,6 @@ void loop(void)
   //  Serial.println("");
   
   time = millis();
-  Serial.print(time); Serial.print(","); Serial.println(actualVoltage_rectifier); Serial.print(","); Serial.print(loadvoltage_capacitor); Serial.print(","); Serial.print(power_mW_capacitor); Serial.print(","); Serial.println(current_mA_capacitor);
+  Serial.print(time); Serial.print(","); Serial.print(actualVoltage_rectifier); Serial.print(","); Serial.print(loadvoltage_capacitor); Serial.print(","); Serial.print(power_mW_capacitor); Serial.print(","); Serial.println(current_mA_capacitor);
   delay(500);
 }
