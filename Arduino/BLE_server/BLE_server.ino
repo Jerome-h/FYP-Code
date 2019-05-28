@@ -12,11 +12,12 @@
 #include <SSD1306.h>
 #include "images.h"
 #include "fonts.h"
-
+#include <string.h>
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
 #include <BLE2902.h>
+
 
 int ID = 1; //ID of sensor device
 
@@ -75,18 +76,25 @@ void setup() {
 }
 
 void loop() {
-  char TxStr[10];
-  sprintf(TxStr, "%d", ID);
+  display.drawString(0, 0, "BLE Server");
+  
+  char timeStr[30];
+  sprintf(timeStr, "%d-%s-%d %d:%d:%d",28,"May",2019,14,44,30); //dud timeStamp for now
+  Serial.println(timeStr);
+  
+  char TxStr[40];
+  sprintf(TxStr, "%s, %d", timeStr,ID);
+  Serial.println(TxStr);
   pCharacteristic.setValue(TxStr);
 
-  //For display, LED and serial monitor indication
+  //For display, LED indication
   digitalWrite(ledPin, LOW); //NB LED pin is active low
   delay(100);
-  char dispStr[10];
+  char dispStr[20];
   sprintf(dispStr, "ID: %d", ID);
-  display.drawString(10, 20, dispStr);
+  display.drawString(0, 20, timeStr); //display time stamp
+  display.drawString(0, 40, dispStr); //display ID
   display.display();
-  Serial.println(dispStr);
 
   digitalWrite(ledPin, HIGH); //NB LED pin is active low
   delay(2000);
