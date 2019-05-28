@@ -82,8 +82,8 @@ void loop() {
   sprintf(timeStr, "%d-%s-%d %d:%d:%d",28,"May",2019,14,44,30); //dud timeStamp for now
   Serial.println(timeStr);
   
-  char TxStr[40];
-  sprintf(TxStr, "%s, %d", timeStr,ID);
+  char TxStr[50];
+  sprintf(TxStr, "Time,ID\n%s,%d", timeStr, ID); //CSV format
   Serial.println(TxStr);
   pCharacteristic.setValue(TxStr);
 
