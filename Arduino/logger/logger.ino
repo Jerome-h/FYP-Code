@@ -10,6 +10,8 @@ Adafruit_INA219 ina219_capacitor(address_cap);
 unsigned long time;
 bool charged = false;
 
+byte checkI2C (byte &address);
+
 void setup(void)
 {
   Serial.begin(9600);
@@ -37,7 +39,6 @@ void setup(void)
 
 void loop(void)
 {
-  byte error_rect, error_cap;
   // Initialise rectifier values
   float shuntvoltage_rectifier = 0;
   float busvoltage_rectifier = 0;
@@ -45,11 +46,8 @@ void loop(void)
   float loadvoltage_rectifier = 0;
   float power_mW_rectifier = 0;
   float actualVoltage_rectifier = 0;
-  
-  Wire.beginTransmission(address_rect);
-  error_rect = Wire.endTransmission();
 
-  if (error_rect == 0) {
+  while (checkI2C (address_rect) == 0) {
     //Rectifier output
     shuntvoltage_rectifier = ina219_rectifier.getShuntVoltage_mV();
     busvoltage_rectifier = ina219_rectifier.getBusVoltage_V();
@@ -57,6 +55,7 @@ void loop(void)
     actualVoltage_rectifier = loadvoltage_rectifier * 4; // divider ratio scaling
     time = millis();
     Serial.print("Rectifier Values:   "); Serial.print(time); Serial.print(","); Serial.println(actualVoltage_rectifier);
+    break;
   }
 
   // Initialise capacitor values
@@ -65,11 +64,10 @@ void loop(void)
   float current_mA_capacitor = 0;
   float loadvoltage_capacitor = 0;
   float power_mW_capacitor = 0;
-  
-  Wire.beginTransmission(address_cap);
-  error_rect = Wire.endTransmission();
 
-  if ( error_cap == 0) {
+
+
+  while (checkI2C (address_cap) == 0) {
     // Across the capacitor bank
     shuntvoltage_capacitor = ina219_capacitor.getShuntVoltage_mV();
     busvoltage_capacitor = ina219_capacitor.getBusVoltage_V();
@@ -78,6 +76,7 @@ void loop(void)
     loadvoltage_capacitor = busvoltage_capacitor + (shuntvoltage_capacitor / 1000);
     time = millis();
     Serial.print("Capacitor Values:   "); Serial.print(time); Serial.print(","); Serial.print(loadvoltage_capacitor); Serial.print(","); Serial.print(power_mW_capacitor); Serial.print(","); Serial.println(current_mA_capacitor);
+    break;
   }
   //  Serial.print("Bus Voltage:   "); Serial.print(busvoltage_rectifier); Serial.println(" V");
   //  Serial.print("Shunt Voltage: "); Serial.print(shuntvoltage_rectifier); Serial.println(" mV");
@@ -85,8 +84,18 @@ void loop(void)
   //  Serial.print("Current:       "); Serial.print(current_mA_rectifier); Serial.println(" mA");
   //  Serial.print("Power:         "); Serial.print(power_mW_rectifier); Serial.println(" mW");
   //  Serial.println("");
+
   if (loadvoltage_capacitor > 14.5) {
     charged = true;
   }
   delay(500);
 }
+
+byte checkI2C (byte &address)
+{
+  byte error;
+  Wire.beginTransmission(address); // checks I2C connection is available
+  error = Wire.endTransmission(); //If is available, error = 0.
+  return error;
+}
+
