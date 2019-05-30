@@ -2,11 +2,9 @@
 
 Repository contains all code relating to the network managemnet, grouped by language. 
 
-- Arduino: contains receiver controlling code and BLE server setup
+- Node-RED: contains the node-RED flows employed on the basestation and drone Raspberry Pis. Includes function codes seperatley
 
-- MATLAB: contains test code used in designing the thingSpeak channel
-
-- node-RED: contains the node-RED flows employed on the basestation Raspberry Pi
+- Receiver Controller: contains receiver controlling code and BLE server setup
 
 - thingSpeak: contains the MATLAB visualisation and analysis code employed on the thingSpeak channels.
 
