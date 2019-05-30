@@ -1,9 +1,11 @@
 /*
     Author: Jerome Hallett
-    Code's purpose is to read sensor values from the INA219 in the receiver, and then broadcast via a BLE server
+    Board: ESP32
+    Code's purpose is to read sensor values from the INA219 in the receiver, and then broadcast via a BLE server.
+    Data broadcasted is the rectifier voltage, current, and state of charge of the receiver.
 
     INA219 sensor code:
-    From https://learn.adafruit.com/adafruit-ina219-current-sensor-breakout/arduino-code
+    Based from https://learn.adafruit.com/adafruit-ina219-current-sensor-breakout/arduino-code
     BLE code:
     Based on Neil Kolban example for IDF: https://github.com/nkolban/esp32-snippets/blob/master/cpp_utils/tests/BLE%20Tests/SampleServer.cpp
     Ported to Arduino ESP32 by Evandro Copercini
@@ -31,6 +33,7 @@
 #include <string.h>
 
 uint8_t ID = 1; //ID of receiver device
+unsigned long timer; //Time since programme started running
 bool charged = false; //Boolean of whether the receiver has been fully charged
 uint8_t ledPin = 16; // Onboard LED reference
 
@@ -185,8 +188,8 @@ void loop() {
     busvoltage_rectifier = ina219_rectifier.getBusVoltage_V();
     loadvoltage_rectifier = busvoltage_rectifier + (shuntvoltage_rectifier / 1000);
     actualVoltage_rectifier = loadvoltage_rectifier * 4; // Potential divider ratio scaling
-    time = millis();
-    Serial.print("Rectifier Values:   "); Serial.print(time); Serial.print(","); Serial.println(actualVoltage_rectifier);
+    timer = millis();
+    Serial.print("Rectifier Values:   "); Serial.print(timer); Serial.print(","); Serial.println(actualVoltage_rectifier);
     break;
   }
   //Capacitor bank sensor read. Measures voltage and current
@@ -196,13 +199,13 @@ void loop() {
     current_mA_capacitor = ina219_capacitor.getCurrent_mA();
     power_mW_capacitor = ina219_capacitor.getPower_mW();
     loadvoltage_capacitor = busvoltage_capacitor + (shuntvoltage_capacitor / 1000);
-    time = millis();
-    Serial.print("Capacitor Values:   "); Serial.print(time); Serial.print(","); Serial.print(loadvoltage_capacitor); Serial.print(","); Serial.print(power_mW_capacitor); Serial.print(","); Serial.println(current_mA_capacitor);
+    timer = millis();
+    Serial.print("Capacitor Values:   "); Serial.print(timer); Serial.print(","); Serial.print(loadvoltage_capacitor); Serial.print(","); Serial.print(power_mW_capacitor); Serial.print(","); Serial.println(current_mA_capacitor);
     break;
   }
 
   /*
-    BLE server update
+    BLE server update of new valid measurements and state of charge
   */
   if (deviceConnected) {
     digitalWrite(ledPin, LOW); //NB LED pin is active low
@@ -217,7 +220,7 @@ void loop() {
     }
 
     char cTimeStr[30]; // dummy timeStamp
-    sprintf(cTimeStr, "%d-%s-%d %d:%d:%d", 29, "May", 2019, 12, 00, 00); // dummy timeStamp
+    sprintf(cTimeStr, "%d-%s-%d %d:%d:%d", 29, "May", 2019, 12, 00, 00); // dummy timeStamp. To update with RTC measurement
     dateTimeCharacteristic.setValue(cTimeStr);
     dateTimeCharacteristic.notify();
     char cTemp[6];
