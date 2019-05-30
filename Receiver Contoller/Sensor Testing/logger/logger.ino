@@ -12,16 +12,20 @@
 #include <Wire.h>
 #include <Adafruit_INA219.h>
 
+//User specfied inputs
+uint8_t chargeThreshold = 14.5; //Threshold of capacitor voltage to consider receiver as charged
+
+//Device setup
+unsigned long timer; //Time since programme started running
+bool charged = false; //Boolean of whether the receiver has been fully charged
+
 //Initialise two instances of the INA219
 byte address_rect = 0x40;
 byte address_cap = 0x41;
 Adafruit_INA219 ina219_rectifier(address_rect);
 Adafruit_INA219 ina219_capacitor(address_cap);
 
-unsigned long timer; //Time since programme started running
-bool charged = false; //Boolean of whether the receiver has been fully charged
-
-// Checks availability of I2C data bus
+// Function to check availability of I2C data bus
 byte checkI2C (byte &address) {
   byte error;
   Wire.beginTransmission(address); // checks I2C connection is available
@@ -107,7 +111,7 @@ void loop(void) {
   //  Serial.println("");
 
   // If capacitor voltage exceeds threshold, consider receiver charged
-  if (loadvoltage_capacitor > 14.5) {
+  if (loadvoltage_capacitor > chargeThreshold) {
     charged = true;
   }
   delay(500);
