@@ -32,7 +32,11 @@
 #include "fonts.h"
 #include <string.h>
 
+//User specfied inputs
 uint8_t ID = 1; //ID of receiver device
+uint8_t chargeThreshold = 14.5; //Threshold of capacitor voltage to consider receiver as charged
+
+//Device setup
 unsigned long timer; //Time since programme started running
 bool charged = false; //Boolean of whether the receiver has been fully charged
 uint8_t ledPin = 16; // Onboard LED reference
@@ -80,7 +84,7 @@ class MyServerCallbacks: public BLEServerCallbacks {
     }
 };
 
-//Initialise BLE server
+//Function to initialise BLE server
 void InitBLE() {
   BLEDevice::init("Receiver1");
 
@@ -116,13 +120,14 @@ void InitBLE() {
   Serial.println("Advertising started");
 }
 
-// Checks availability of I2C data bus
+// Function to check availability of I2C data bus
 byte checkI2C (byte &address) {
   byte error;
   Wire.beginTransmission(address); // checks I2C connection is available
   error = Wire.endTransmission(); //If is available, error = 0.
   return error;
 }
+
 
 void setup() {
   pinMode(ledPin, OUTPUT); // Onboard LED reference
@@ -141,12 +146,10 @@ void setup() {
 
   // Create the BLE Device
   InitBLE();
-  // Start advertising
-
   Serial.println("Waiting for a client connection to notify...");
-
-  uint32_t currentFrequency;
+  
   // Initialize the INA219.
+  uint32_t currentFrequency;
   // By default the initialization will use the largest range (32V, 2A).  However
   // you can call a setCalibration function to change this range (see comments).
   ina219_rectifier.begin();
@@ -202,6 +205,10 @@ void loop() {
     timer = millis();
     Serial.print("Capacitor Values:   "); Serial.print(timer); Serial.print(","); Serial.print(loadvoltage_capacitor); Serial.print(","); Serial.print(power_mW_capacitor); Serial.print(","); Serial.println(current_mA_capacitor);
     break;
+  }
+    // If capacitor voltage exceeds threshold, consider receiver charged
+  if (loadvoltage_capacitor > chargeThreshold) {
+    charged = true;
   }
 
   /*
