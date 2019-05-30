@@ -2,7 +2,7 @@
 
 Repository contains all code relating to the network managemnet, grouped by language. 
 
-- Node-RED: contains the node-RED flows employed on the basestation and drone Raspberry Pis. Includes function codes seperatley
+- Node-RED: contains the Node-RED flows employed on the basestation and drone Raspberry Pis. Includes function codes seperatley
 
 - Receiver Controller: contains receiver controlling code and BLE server setup
 
