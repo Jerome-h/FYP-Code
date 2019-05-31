@@ -37,11 +37,11 @@
 
 //User specfied inputs
 uint8_t ID = 1; //ID of receiver device
-uint8_t chargeThreshold = 14.5; //Threshold of capacitor voltage to consider receiver as charged
+uint8_t chargeThreshold = 14.5; //Threshold of capacitor voltage to consider receiver as deviceCharged
 
 //Device setup
 unsigned long timer; //Time since programme started running
-bool charged = false; //Boolean of whether the receiver has been fully charged
+uint8_t deviceCharged = 0; //Boolean of whether the receiver has been fully deviceCharged
 uint8_t ledPin = 16; // Onboard LED reference
 
 // The built-in OLED is a 128*64 mono pixel display
@@ -51,30 +51,32 @@ uint8_t ledPin = 16; // Onboard LED reference
 SSD1306 display(0x3c, 5, 4);
 
 //Initialise two instances of the INA219
-byte address_rect = 0x40;
-byte address_cap = 0x41;
-Adafruit_INA219 ina219_rectifier(address_rect);
-Adafruit_INA219 ina219_capacitor(address_cap);
+byte addressRect = 0x40;
+byte addressCap = 0x41;
+Adafruit_INA219 ina219_rectifier(addressRect);
+Adafruit_INA219 ina219_capacitor(addressCap);
 
 //BLE setup
 bool deviceConnected = false;
 uint8_t value = 0;
 
-// https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Gatt/Xml/Characteristics/org.bluetooth.characteristic.temperature_measurement.xml
-// https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Gatt/Xml/Characteristics/org.bluetooth.characteristic.humidity.xml
+// https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Gatt/Xml/Characteristics/org.bluetooth.characteristic.day_date_time.xml
+// https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Specifications/Mesh/Xml/Characteristics/org.bluetooth.characteristic.voltage.xml
+// https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Gatt/Xml/Characteristics/org.bluetooth.characteristic.battery_level_state.xml
 
 BLEDescriptor dateTimeDescriptor(BLEUUID((uint16_t)0x290C));
-BLEDescriptor temperatureDescriptor(BLEUUID((uint16_t)0x290C));
-BLEDescriptor humidityDescriptor(BLEUUID((uint16_t)0x290C));
+BLEDescriptor voltageDescriptor(BLEUUID((uint16_t)0x290C));
+BLEDescriptor batteryLevelStateDescriptor(BLEUUID((uint16_t)0x290C));
+
 BLEDescriptor dateTimeMeasurement(BLEUUID((uint16_t)0x2901));
-BLEDescriptor temperatureMeasurement(BLEUUID((uint16_t)0x2901));
-BLEDescriptor humidityMeasurement(BLEUUID((uint16_t)0x2901));
+BLEDescriptor voltageMeasurement(BLEUUID((uint16_t)0x2901));
+BLEDescriptor batteryLevelStateMeasurement(BLEUUID((uint16_t)0x2901));
 
 BLECharacteristic dateTimeCharacteristic(BLEUUID((uint16_t)0x2A0A),  // standard 16-bit characteristic UUID
     BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
-BLECharacteristic temperatureCharacteristic(BLEUUID((uint16_t)0x2A6E),  // standard 16-bit characteristic UUID
-    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
-BLECharacteristic humidityCharacteristic(BLEUUID((uint16_t)0x2A6F),  // standard 16-bit characteristic UUID
+BLECharacteristic voltageCharacteristic(BLEUUID((uint16_t)0x2B18),  // standard 16-bit characteristic UUID
+                                        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+BLECharacteristic batteryLevelStateCharacteristic(BLEUUID((uint16_t)0x2A1B),  // standard 16-bit characteristic UUID
     BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 
 class MyServerCallbacks: public BLEServerCallbacks {
@@ -100,20 +102,20 @@ void InitBLE() {
   Serial.println("Created service");
   // Add Charcteristics
   pService->addCharacteristic(&dateTimeCharacteristic);
-  pService->addCharacteristic(&temperatureCharacteristic);
-  pService->addCharacteristic(&humidityCharacteristic);
+  pService->addCharacteristic(&voltageCharacteristic);
+  pService->addCharacteristic(&batteryLevelStateCharacteristic);
   Serial.println("Added characteristics");
 
   dateTimeDescriptor.setValue("Date Time eg 29-May-2019 12:00:00");
   dateTimeCharacteristic.addDescriptor(&dateTimeDescriptor);
-  temperatureDescriptor.setValue("Temperature -50-50°C");
-  temperatureCharacteristic.addDescriptor(&temperatureDescriptor);
-  humidityDescriptor.setValue("Humidity 0-100%");
-  humidityCharacteristic.addDescriptor(&humidityDescriptor);
+  voltageDescriptor.setValue("Voltage eg 10");
+  voltageCharacteristic.addDescriptor(&voltageDescriptor);
+  batteryLevelStateDescriptor.setValue("Battery Level State eg 0/1");
+  batteryLevelStateCharacteristic.addDescriptor(&batteryLevelStateDescriptor);
   Serial.println("Added descriptors");
   dateTimeCharacteristic.addDescriptor(new BLE2902());
-  temperatureCharacteristic.addDescriptor(new BLE2902());
-  humidityCharacteristic.addDescriptor(new BLE2902());
+  voltageCharacteristic.addDescriptor(new BLE2902());
+  batteryLevelStateCharacteristic.addDescriptor(new BLE2902());
   Serial.println("Added 2902");
 
   pService->start();
@@ -140,7 +142,7 @@ void setup() {
   display.setFont(Roboto_Medium_14);
   display.drawString(0, 0, "BLE Server");
   display.display();
-  digitalWrite(ledPin, LOW); //NB LED pin is active low
+  digitalWrite(ledPin, LOW); //NB ESP LED pin is active low
   delay(1500);
   display.clear();
 
@@ -164,24 +166,22 @@ void setup() {
   //ina219.setCalibration_16V_400mA();
   Serial.println("Measuring voltage and current with INA219 ...");
 }
-float fTemp = 0;
-float fHumidity = 40;
 
 void loop() {
   // Initialise rectifier sensor values
-  float shuntvoltage_rectifier = 0;
-  float busvoltage_rectifier = 0;
-  float current_mA_rectifier = 0;
-  float loadvoltage_rectifier = 0;
-  float power_mW_rectifier = 0;
-  float actualVoltage_rectifier = 0;
+  float shuntVoltageRectifier = 0;
+  float busVoltageRectifier = 0;
+  float currentRectifier_mA = 0;
+  float loadVoltageRectifier = 0;
+  float powerRectifier_mW = 0;
+  float actualVoltageRectifier = 0;
 
   // Initialise capacitor sensor values
-  float shuntvoltage_capacitor = 0;
-  float busvoltage_capacitor = 0;
-  float current_mA_capacitor = 0;
-  float loadvoltage_capacitor = 0;
-  float power_mW_capacitor = 0;
+  float shuntVoltageCapacitor = 0;
+  float busVoltageCapacitor = 0;
+  float currentCapacitor_mA = 0;
+  float loadVoltageCapacitor = 0;
+  float powerCapacitor_mW = 0;
 
   bool validRead = false; //flag to determine if data successfully read
 
@@ -189,40 +189,40 @@ void loop() {
     Now to read values from the INA219 sensors.
     If I2C unavailable due to interference, breaks the while loop to avoid process stalling.
   */
-  while (checkI2C (address_rect) == 0 && checkI2C (address_cap) == 0 ) {
+  while (checkI2C (addressRect) == 0 && checkI2C (addressCap) == 0 ) {
     //rectifier sensor read. Measures voltage from the potential divider and scales it up
-    shuntvoltage_rectifier = ina219_rectifier.getShuntVoltage_mV();
-    busvoltage_rectifier = ina219_rectifier.getBusVoltage_V();
-    loadvoltage_rectifier = busvoltage_rectifier + (shuntvoltage_rectifier / 1000);
-    actualVoltage_rectifier = loadvoltage_rectifier * 4; // Potential divider ratio scaling
+    shuntVoltageRectifier = ina219_rectifier.getShuntVoltage_mV();
+    busVoltageRectifier = ina219_rectifier.getBusVoltage_V();
+    loadVoltageRectifier = busVoltageRectifier + (shuntVoltageRectifier / 1000);
+    actualVoltageRectifier = loadVoltageRectifier * 4; // Potential divider ratio scaling
     // timer = millis();
-    // Serial.print("Rectifier Values:   "); Serial.print(timer); Serial.print(","); Serial.println(actualVoltage_rectifier);
+    // Serial.print("Rectifier Values:   "); Serial.print(timer); Serial.print(","); Serial.println(actualVoltageRectifier);
 
     //Capacitor bank sensor read. Measures voltage and current
-    shuntvoltage_capacitor = ina219_capacitor.getShuntVoltage_mV();
-    busvoltage_capacitor = ina219_capacitor.getBusVoltage_V();
-    current_mA_capacitor = ina219_capacitor.getCurrent_mA();
-    loadvoltage_capacitor = busvoltage_capacitor + (shuntvoltage_capacitor / 1000);
-    power_mW_capacitor = loadvoltage_capacitor * current_mA_capacitor;
+    shuntVoltageCapacitor = ina219_capacitor.getShuntVoltage_mV();
+    busVoltageCapacitor = ina219_capacitor.getBusVoltage_V();
+    currentCapacitor_mA = ina219_capacitor.getCurrent_mA();
+    loadVoltageCapacitor = busVoltageCapacitor + (shuntVoltageCapacitor / 1000);
+    powerCapacitor_mW = loadVoltageCapacitor * currentCapacitor_mA;
     // timer = millis();
-    // Serial.print("Capacitor Values:   "); Serial.print(timer); Serial.print(","); Serial.print(loadvoltage_capacitor); Serial.print(","); Serial.print(power_mW_capacitor); Serial.print(","); Serial.println(current_mA_capacitor);
+    // Serial.print("Capacitor Values:   "); Serial.print(timer); Serial.print(","); Serial.print(loadVoltageCapacitor); Serial.print(","); Serial.print(powerCapacitor_mW); Serial.print(","); Serial.println(currentCapacitor_mA);
 
-    //  Serial.print("Bus Voltage:   "); Serial.print(busvoltage_rectifier); Serial.println(" V");
-    //  Serial.print("Shunt Voltage: "); Serial.print(shuntvoltage_rectifier); Serial.println(" mV");
-    //  Serial.print("Load Voltage:  "); Serial.print(loadvoltage_rectifier); Serial.println(" V");
-    //  Serial.print("Current:       "); Serial.print(current_mA_rectifier); Serial.println(" mA");
-    //  Serial.print("Power:         "); Serial.print(power_mW_rectifier); Serial.println(" mW");
+    //  Serial.print("Bus Voltage:   "); Serial.print(busVoltageRectifier); Serial.println(" V");
+    //  Serial.print("Shunt Voltage: "); Serial.print(shuntVoltageRectifier); Serial.println(" mV");
+    //  Serial.print("Load Voltage:  "); Serial.print(loadVoltageRectifier); Serial.println(" V");
+    //  Serial.print("Current:       "); Serial.print(currentRectifier_mA); Serial.println(" mA");
+    //  Serial.print("Power:         "); Serial.print(powerRectifier_mW); Serial.println(" mW");
     //  Serial.println("");
 
-    // If capacitor voltage exceeds threshold, consider receiver charged
-    if (loadvoltage_capacitor > chargeThreshold) {
-      charged = true;
+    // If capacitor voltage exceeds threshold, consider receiver deviceCharged
+    if (loadVoltageCapacitor > chargeThreshold) {
+      deviceCharged = 1;
     }
-
-    //Remove comments to output in CSV format to serial. Only prints if both measurements are successful
-    if (actualVoltage_rectifier < 31 && loadvoltage_capacitor < 31) {
+    if (actualVoltageRectifier < 31 && loadVoltageCapacitor < 31) {
+      validRead = true; //flag to determine if data successfully read
+      //  Remove comment to output in CSV format. Only prints if both measurements are successful
       timer = millis();
-      Serial.print(timer); Serial.print(","); Serial.print(actualVoltage_rectifier); Serial.print(","); Serial.print(loadvoltage_capacitor); Serial.print(","); Serial.print(current_mA_capacitor); Serial.print(","); Serial.println(power_mW_capacitor); // }
+      Serial.print(timer); Serial.print(","); Serial.print(actualVoltageRectifier); Serial.print(","); Serial.print(loadVoltageCapacitor); Serial.print(","); Serial.print(currentCapacitor_mA); Serial.print(","); Serial.println(powerCapacitor_mW);
     }
     break; //break while loop
   }
@@ -230,41 +230,29 @@ void loop() {
   /*
     BLE server update of new valid measurements and state of charge
   */
-  if (deviceConnected) {
-    digitalWrite(ledPin, LOW); //NB LED pin is active low
+  if (deviceConnected && validRead == true) {
+    digitalWrite(ledPin, LOW); //NB ESP LED pin is active low
     Serial.printf("*** Notify: %d ***\n", value);
-    fTemp += 1.1;
-    if (fTemp > 50) {
-      fTemp = 0;
-    }
-    fHumidity += 1.1;
-    if (fHumidity > 100) {
-      fHumidity = 40;
-    }
 
-    char cTimeStr[30]; // dummy timeStamp
+    char cTimeStr[30]; //dummy timeStamp
     sprintf(cTimeStr, "%d-%s-%d %d:%d:%d", 29, "May", 2019, 12, 00, 00); // Format time for suitable use in thingSpeak MATLAB visualisation (ISO 8601) http://www.cplusplus.com/reference/ctime/strftime/ . dummy timeStamp. To update with RTC measurement
     dateTimeCharacteristic.setValue(cTimeStr);
     dateTimeCharacteristic.notify();
-    char cTemp[6];
-    sprintf(cTemp, "%0.2f", fTemp);
-    temperatureCharacteristic.setValue(cTemp);
-    temperatureCharacteristic.notify();
-    char cHumidity[6];
-    sprintf(cHumidity, "%0.2f", fHumidity);
-    humidityCharacteristic.setValue(cHumidity);
-    humidityCharacteristic.notify();
-    Serial.printf("    Values: %s %0.2f %0.2f\n", cTimeStr, fTemp, fHumidity);
+    char cVolt[6]; //rectifier voltage
+    sprintf(cVolt, "%0.2f", actualVoltageRectifier);
+    voltageCharacteristic.setValue(cVolt);
+    voltageCharacteristic.notify();
+    char cState[6];
+    sprintf(cState, "%d", deviceCharged);
+    batteryLevelStateCharacteristic.setValue(cState);
+    batteryLevelStateCharacteristic.notify();
+    Serial.printf("    Values: %s %0.2f %0.2f\n", cTimeStr, actualVoltageRectifier, deviceCharged);
+    display.drawString(0, 0, "Data Sent!");
+    display.display();
+    value++;
   }
 
-  if (validRect && validCap) {
-    validRead = true; //flag to determine if data successfully read
-    //  Remove comment to output in CSV format. Only prints if both measurements are successful
-    timer = millis();
-    Serial.print(timer); Serial.print(","); Serial.print(actualVoltage_rectifier); Serial.print(","); Serial.print(loadvoltage_capacitor); Serial.print(","); Serial.println(current_mA_capacitor); Serial.print(","); Serial.print(power_mW_capacitor);
-  }
-
-  digitalWrite(ledPin, HIGH); //NB LED pin is active low
-  delay(2000);
-  value++;
+  digitalWrite(ledPin, HIGH); //NB ESP LED pin is active low
+  delay(500);
+  display.clear();
 }
