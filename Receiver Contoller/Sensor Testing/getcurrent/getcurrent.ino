@@ -1,3 +1,13 @@
+/*
+    Author: Jerome Hallett
+    Board: Arduino Uno
+    Code's purpose is to read sensor values from the INA219 in the receiver
+    Measures the rectifier voltage, current, and state of charge of the receiver.
+
+    INA219 sensor code:
+    Based from https://learn.adafruit.com/adafruit-ina219-current-sensor-breakout/arduino-code
+*/
+
 #include <Wire.h>
 #include <Adafruit_INA219.h>
 
@@ -7,7 +17,7 @@ byte address_cap = 0x41;
 Adafruit_INA219 ina219_rectifier(address_rect);
 Adafruit_INA219 ina219_capacitor(address_cap);
 
-unsigned long time;
+unsigned long timer;
 
 void setup(void)
 {
@@ -72,8 +82,9 @@ void loop(void)
   //  Serial.print("Current:       "); Serial.print(current_mA_rectifier); Serial.println(" mA");
   //  Serial.print("Power:         "); Serial.print(power_mW_rectifier); Serial.println(" mW");
   //  Serial.println("");
-  
-  time = millis();
-  Serial.print(time); Serial.print(","); Serial.print(actualVoltage_rectifier); Serial.print(","); Serial.print(loadvoltage_capacitor); Serial.print(","); Serial.print(power_mW_capacitor); Serial.print(","); Serial.println(current_mA_capacitor);
+
+  //Output in CSV format
+  timer = millis();
+  Serial.print(timer); Serial.print(","); Serial.print(actualVoltage_rectifier); Serial.print(","); Serial.print(loadvoltage_capacitor); Serial.print(","); Serial.print(power_mW_capacitor); Serial.print(","); Serial.println(current_mA_capacitor);
   delay(500);
 }

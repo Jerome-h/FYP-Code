@@ -1,4 +1,10 @@
 /*
+    Author: Jerome Hallett
+    Board: ESP32
+    Setup a BLE server
+    Also displays information through the ESP32's OLED screen. Requires files: fonts.h, images.h
+
+    BLE code:
     Based on Neil Kolban example for IDF: https://github.com/nkolban/esp32-snippets/blob/master/cpp_utils/tests/BLE%20Tests/SampleServer.cpp
     Ported to Arduino ESP32 by Evandro Copercini
     updates by chegewara
@@ -77,11 +83,11 @@ void setup() {
 
 void loop() {
   display.drawString(0, 0, "BLE Server");
-  
+
   char timeStr[30];
-  sprintf(timeStr, "%d-%s-%d %d:%d:%d",28,"May",2019,14,44,30); //dud timeStamp for now
+  sprintf(timeStr, "%d-%s-%d %d:%d:%d", 28, "May", 2019, 14, 44, 30); //dud timeStamp for now
   Serial.println(timeStr);
-  
+
   char TxStr[50];
   sprintf(TxStr, "Time,ID\n%s,%d", timeStr, ID); //CSV format
   Serial.println(TxStr);

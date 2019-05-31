@@ -1,8 +1,10 @@
 /*
     Author: Jerome Hallett
     Board: ESP32
-    Code's purpose is to read sensor values from the INA219 in the receiver, and then broadcast via a BLE server.
-    Data broadcasted is the rectifier voltage, current, and state of charge of the receiver.
+    Requires files in same directory for OLED screen: fonts.h, images.h
+    Code's purpose is to read sensor values from the INA219 in the receiver, checking I2C connection available to avoid process stalling.
+    Then broadcasts data via a BLE server. Data broadcasted is the rectifier voltage, current, and state of charge of the receiver.
+    Also displays information through the ESP32's OLED screen.
 
     INA219 sensor code:
     Based from https://learn.adafruit.com/adafruit-ina219-current-sensor-breakout/arduino-code
@@ -14,7 +16,8 @@
 */
 
 // Import required libraries
-//INA219 Sensor & I2C
+#include <Arduino.h>
+//INA219 sensor & I2C
 #include <Wire.h>
 #include <Adafruit_INA219.h>
 //BLE
@@ -128,9 +131,9 @@ byte checkI2C (byte &address) {
   return error;
 }
 
-
 void setup() {
   pinMode(ledPin, OUTPUT); // Onboard LED reference
+
   // Initialize the OLED display
   display.init();
   display.flipScreenVertically();
@@ -147,9 +150,10 @@ void setup() {
   // Create the BLE Device
   InitBLE();
   Serial.println("Waiting for a client connection to notify...");
-  
+
   // Initialize the INA219.
   uint32_t currentFrequency;
+  Wire.begin(21, 22);
   // By default the initialization will use the largest range (32V, 2A).  However
   // you can call a setCalibration function to change this range (see comments).
   ina219_rectifier.begin();
@@ -179,36 +183,48 @@ void loop() {
   float loadvoltage_capacitor = 0;
   float power_mW_capacitor = 0;
 
+  bool validRead = false; //flag to determine if data successfully read
+
   /*
     Now to read values from the INA219 sensors.
     If I2C unavailable due to interference, breaks the while loop to avoid process stalling.
-    Read seperatley so valid values can be independently broadcasted
   */
-
-  //Rectifier sensor read. Measures voltage from the potential divider and scales it up
-  while (checkI2C (address_rect) == 0) {
+  while (checkI2C (address_rect) == 0 && checkI2C (address_cap) == 0 ) {
+    //rectifier sensor read. Measures voltage from the potential divider and scales it up
     shuntvoltage_rectifier = ina219_rectifier.getShuntVoltage_mV();
     busvoltage_rectifier = ina219_rectifier.getBusVoltage_V();
     loadvoltage_rectifier = busvoltage_rectifier + (shuntvoltage_rectifier / 1000);
     actualVoltage_rectifier = loadvoltage_rectifier * 4; // Potential divider ratio scaling
-    timer = millis();
-    Serial.print("Rectifier Values:   "); Serial.print(timer); Serial.print(","); Serial.println(actualVoltage_rectifier);
-    break;
-  }
-  //Capacitor bank sensor read. Measures voltage and current
-  while (checkI2C (address_cap) == 0) {
+    // timer = millis();
+    // Serial.print("Rectifier Values:   "); Serial.print(timer); Serial.print(","); Serial.println(actualVoltage_rectifier);
+
+    //Capacitor bank sensor read. Measures voltage and current
     shuntvoltage_capacitor = ina219_capacitor.getShuntVoltage_mV();
     busvoltage_capacitor = ina219_capacitor.getBusVoltage_V();
     current_mA_capacitor = ina219_capacitor.getCurrent_mA();
-    power_mW_capacitor = ina219_capacitor.getPower_mW();
     loadvoltage_capacitor = busvoltage_capacitor + (shuntvoltage_capacitor / 1000);
-    timer = millis();
-    Serial.print("Capacitor Values:   "); Serial.print(timer); Serial.print(","); Serial.print(loadvoltage_capacitor); Serial.print(","); Serial.print(power_mW_capacitor); Serial.print(","); Serial.println(current_mA_capacitor);
-    break;
-  }
+    power_mW_capacitor = loadvoltage_capacitor * current_mA_capacitor;
+    // timer = millis();
+    // Serial.print("Capacitor Values:   "); Serial.print(timer); Serial.print(","); Serial.print(loadvoltage_capacitor); Serial.print(","); Serial.print(power_mW_capacitor); Serial.print(","); Serial.println(current_mA_capacitor);
+
+    //  Serial.print("Bus Voltage:   "); Serial.print(busvoltage_rectifier); Serial.println(" V");
+    //  Serial.print("Shunt Voltage: "); Serial.print(shuntvoltage_rectifier); Serial.println(" mV");
+    //  Serial.print("Load Voltage:  "); Serial.print(loadvoltage_rectifier); Serial.println(" V");
+    //  Serial.print("Current:       "); Serial.print(current_mA_rectifier); Serial.println(" mA");
+    //  Serial.print("Power:         "); Serial.print(power_mW_rectifier); Serial.println(" mW");
+    //  Serial.println("");
+
     // If capacitor voltage exceeds threshold, consider receiver charged
-  if (loadvoltage_capacitor > chargeThreshold) {
-    charged = true;
+    if (loadvoltage_capacitor > chargeThreshold) {
+      charged = true;
+    }
+
+    //Remove comments to output in CSV format to serial. Only prints if both measurements are successful
+    if (actualVoltage_rectifier < 31 && loadvoltage_capacitor < 31) {
+      timer = millis();
+      Serial.print(timer); Serial.print(","); Serial.print(actualVoltage_rectifier); Serial.print(","); Serial.print(loadvoltage_capacitor); Serial.print(","); Serial.print(current_mA_capacitor); Serial.print(","); Serial.println(power_mW_capacitor); // }
+    }
+    break; //break while loop
   }
 
   /*
@@ -227,7 +243,7 @@ void loop() {
     }
 
     char cTimeStr[30]; // dummy timeStamp
-    sprintf(cTimeStr, "%d-%s-%d %d:%d:%d", 29, "May", 2019, 12, 00, 00); // dummy timeStamp. To update with RTC measurement
+    sprintf(cTimeStr, "%d-%s-%d %d:%d:%d", 29, "May", 2019, 12, 00, 00); // Format time for suitable use in thingSpeak MATLAB visualisation (ISO 8601) http://www.cplusplus.com/reference/ctime/strftime/ . dummy timeStamp. To update with RTC measurement
     dateTimeCharacteristic.setValue(cTimeStr);
     dateTimeCharacteristic.notify();
     char cTemp[6];
@@ -240,6 +256,14 @@ void loop() {
     humidityCharacteristic.notify();
     Serial.printf("    Values: %s %0.2f %0.2f\n", cTimeStr, fTemp, fHumidity);
   }
+
+  if (validRect && validCap) {
+    validRead = true; //flag to determine if data successfully read
+    //  Remove comment to output in CSV format. Only prints if both measurements are successful
+    timer = millis();
+    Serial.print(timer); Serial.print(","); Serial.print(actualVoltage_rectifier); Serial.print(","); Serial.print(loadvoltage_capacitor); Serial.print(","); Serial.println(current_mA_capacitor); Serial.print(","); Serial.print(power_mW_capacitor);
+  }
+
   digitalWrite(ledPin, HIGH); //NB LED pin is active low
   delay(2000);
   value++;
