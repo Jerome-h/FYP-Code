@@ -48,18 +48,21 @@ uint8_t ledPin = 16; // Onboard LED reference
 // i2c address = 0x3c
 // SDA = 5
 // SCL = 4
-SSD1306 display(0x3c, 5, 4);
+SSD1306 display(0x3c, 21, 22);
 
 //Initialise two instances of the INA219
 byte addressRect = 0x40;
 byte addressCap = 0x41;
-Adafruit_INA219 ina219_rectifier(addressRect);
-Adafruit_INA219 ina219_capacitor(addressCap);
+Adafruit_INA219 ina219Rectifier(addressRect);
+Adafruit_INA219 ina219Capacitor(addressCap);
 
 //BLE setup
 bool deviceConnected = false;
 uint8_t value = 0;
 
+/*
+ Device to transmit device ID, timestamp, 
+ */
 // https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Gatt/Xml/Characteristics/org.bluetooth.characteristic.day_date_time.xml
 // https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Specifications/Mesh/Xml/Characteristics/org.bluetooth.characteristic.voltage.xml
 // https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Gatt/Xml/Characteristics/org.bluetooth.characteristic.battery_level_state.xml
@@ -158,8 +161,8 @@ void setup() {
   Wire.begin(21, 22);
   // By default the initialization will use the largest range (32V, 2A).  However
   // you can call a setCalibration function to change this range (see comments).
-  ina219_rectifier.begin();
-  ina219_capacitor.begin();
+  ina219Rectifier.begin();
+  ina219Capacitor.begin();
   // To use a slightly lower 32V, 1A range (higher precision on amps):
   //ina219.setCalibration_32V_1A();
   // Or to use a lower 16V, 400mA range (higher precision on volts and amps):
@@ -191,17 +194,17 @@ void loop() {
   */
   while (checkI2C (addressRect) == 0 && checkI2C (addressCap) == 0 ) {
     //rectifier sensor read. Measures voltage from the potential divider and scales it up
-    shuntVoltageRectifier = ina219_rectifier.getShuntVoltage_mV();
-    busVoltageRectifier = ina219_rectifier.getBusVoltage_V();
+    shuntVoltageRectifier = ina219Rectifier.getShuntVoltage_mV();
+    busVoltageRectifier = ina219Rectifier.getBusVoltage_V();
     loadVoltageRectifier = busVoltageRectifier + (shuntVoltageRectifier / 1000);
     actualVoltageRectifier = loadVoltageRectifier * 4; // Potential divider ratio scaling
     // timer = millis();
     // Serial.print("Rectifier Values:   "); Serial.print(timer); Serial.print(","); Serial.println(actualVoltageRectifier);
 
     //Capacitor bank sensor read. Measures voltage and current
-    shuntVoltageCapacitor = ina219_capacitor.getShuntVoltage_mV();
-    busVoltageCapacitor = ina219_capacitor.getBusVoltage_V();
-    currentCapacitor_mA = ina219_capacitor.getCurrent_mA();
+    shuntVoltageCapacitor = ina219Capacitor.getShuntVoltage_mV();
+    busVoltageCapacitor = ina219Capacitor.getBusVoltage_V();
+    currentCapacitor_mA = ina219Capacitor.getCurrent_mA();
     loadVoltageCapacitor = busVoltageCapacitor + (shuntVoltageCapacitor / 1000);
     powerCapacitor_mW = loadVoltageCapacitor * currentCapacitor_mA;
     // timer = millis();
@@ -214,15 +217,13 @@ void loop() {
     //  Serial.print("Power:         "); Serial.print(powerRectifier_mW); Serial.println(" mW");
     //  Serial.println("");
 
-    // If capacitor voltage exceeds threshold, consider receiver deviceCharged
-    if (loadVoltageCapacitor > chargeThreshold) {
-      deviceCharged = 1;
-    }
+    //If statement to check if the sensor read was valid
     if (actualVoltageRectifier < 31 && loadVoltageCapacitor < 31) {
       validRead = true; //flag to determine if data successfully read
-      //  Remove comment to output in CSV format. Only prints if both measurements are successful
-      timer = millis();
-      Serial.print(timer); Serial.print(","); Serial.print(actualVoltageRectifier); Serial.print(","); Serial.print(loadVoltageCapacitor); Serial.print(","); Serial.print(currentCapacitor_mA); Serial.print(","); Serial.println(powerCapacitor_mW);
+      // If capacitor voltage exceeds threshold, consider receiver deviceCharged
+      if (loadVoltageCapacitor > chargeThreshold) {
+        deviceCharged = 1;
+      }
     }
     break; //break while loop
   }
@@ -238,21 +239,25 @@ void loop() {
     sprintf(cTimeStr, "%d-%s-%d %d:%d:%d", 29, "May", 2019, 12, 00, 00); // Format time for suitable use in thingSpeak MATLAB visualisation (ISO 8601) http://www.cplusplus.com/reference/ctime/strftime/ . dummy timeStamp. To update with RTC measurement
     dateTimeCharacteristic.setValue(cTimeStr);
     dateTimeCharacteristic.notify();
-    char cVolt[6]; //rectifier voltage
+    char cVolt[10]; //rectifier voltage
     sprintf(cVolt, "%0.2f", actualVoltageRectifier);
     voltageCharacteristic.setValue(cVolt);
     voltageCharacteristic.notify();
-    char cState[6];
+    char cState[10];
     sprintf(cState, "%d", deviceCharged);
     batteryLevelStateCharacteristic.setValue(cState);
     batteryLevelStateCharacteristic.notify();
-    Serial.printf("    Values: %s %0.2f %0.2f\n", cTimeStr, actualVoltageRectifier, deviceCharged);
-    display.drawString(0, 0, "Data Sent!");
+    //  Remove comment to output in CSV format
+    timer = millis();
+    Serial.printf("%d,%f,%f,%f,%f\n", timer, actualVoltageRectifier, loadVoltageCapacitor, currentCapacitor_mA, powerCapacitor_mW);
+    // Serial print transmitted values
+    Serial.printf("    Values: %s %0.2f %d\n", cTimeStr, actualVoltageRectifier, deviceCharged);
+    display.drawString(0, 20, "Data Sent!");
     display.display();
     value++;
   }
 
   digitalWrite(ledPin, HIGH); //NB ESP LED pin is active low
-  delay(500);
+  delay(1500);
   display.clear();
 }
