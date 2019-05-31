@@ -1,7 +1,7 @@
 /*
     Author: Jerome Hallett
     Board: ESP32
-    Requires files in same directory for OLED screen: fonts.h, images.h
+    For OLED screen functionality, import files into same directory: fonts.h, images.h
     Code's purpose is to read sensor values from the INA219 in the receiver, checking I2C connection available to avoid process stalling.
     Then broadcasts data via a BLE server. Data broadcasted is the rectifier voltage, current, and state of charge of the receiver.
     Also displays information through the ESP32's OLED screen.
@@ -15,7 +15,7 @@
     With code from https://github.com/nkolban/esp32-snippets/issues/175
 */
 
-// Import required libraries
+//Import required libraries
 #include <Arduino.h>
 //INA219 sensor & I2C
 #include <Wire.h>
@@ -36,19 +36,19 @@
 #include <string.h>
 
 //User specfied inputs
-uint8_t ID = 1; //ID of receiver device
+uint8_t deviceID = 1; //ID of receiver device. Will become the name of the server
 uint8_t chargeThreshold = 14.5; //Threshold of capacitor voltage to consider receiver as deviceCharged
 
 //Device setup
 unsigned long timer; //Time since programme started running
 uint8_t deviceCharged = 0; //Boolean of whether the receiver has been fully deviceCharged
-uint8_t ledPin = 16; // Onboard LED reference
+uint8_t ledPin = 16; //Onboard LED reference
 
 // The built-in OLED is a 128*64 mono pixel display
 // i2c address = 0x3c
 // SDA = 5
 // SCL = 4
-SSD1306 display(0x3c, 21, 22);
+SSD1306 display(0x3c, 5, 4);
 
 //Initialise two instances of the INA219
 byte addressRect = 0x40;
@@ -61,8 +61,9 @@ bool deviceConnected = false;
 uint8_t value = 0;
 
 /*
- Device to transmit device ID, timestamp, 
- */
+  Device to transmit device timestamp, ID (Name of device), rectifier voltage and state of battery charge.
+  GATT Characteristics
+*/
 // https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Gatt/Xml/Characteristics/org.bluetooth.characteristic.day_date_time.xml
 // https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Specifications/Mesh/Xml/Characteristics/org.bluetooth.characteristic.voltage.xml
 // https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Gatt/Xml/Characteristics/org.bluetooth.characteristic.battery_level_state.xml
@@ -94,7 +95,9 @@ class MyServerCallbacks: public BLEServerCallbacks {
 
 //Function to initialise BLE server
 void InitBLE() {
-  BLEDevice::init("Receiver1");
+  char cID[5];
+  sprintf(cID, "%d", deviceID);
+  BLEDevice::init(cID); //device ID
 
   // Create the BLE Server
   BLEServer *pServer = BLEDevice::createServer();
@@ -113,7 +116,7 @@ void InitBLE() {
   dateTimeCharacteristic.addDescriptor(&dateTimeDescriptor);
   voltageDescriptor.setValue("Voltage eg 10");
   voltageCharacteristic.addDescriptor(&voltageDescriptor);
-  batteryLevelStateDescriptor.setValue("Battery Level State eg 0/1");
+  batteryLevelStateDescriptor.setValue("Battery Level State eg 1");
   batteryLevelStateCharacteristic.addDescriptor(&batteryLevelStateDescriptor);
   Serial.println("Added descriptors");
   dateTimeCharacteristic.addDescriptor(new BLE2902());
@@ -133,6 +136,10 @@ byte checkI2C (byte &address) {
   byte error;
   Wire.beginTransmission(address); // checks I2C connection is available
   error = Wire.endTransmission(); //If is available, error = 0.
+  if (error > 0) {
+    display.drawString(0, 20, "I2C unavailable");
+    display.display();
+  }
   return error;
 }
 
@@ -158,7 +165,7 @@ void setup() {
 
   // Initialize the INA219.
   uint32_t currentFrequency;
-  Wire.begin(21, 22);
+  Wire.begin(5, 4);
   // By default the initialization will use the largest range (32V, 2A).  However
   // you can call a setCalibration function to change this range (see comments).
   ina219Rectifier.begin();
@@ -225,7 +232,7 @@ void loop() {
         deviceCharged = 1;
       }
     }
-    break; //break while loop
+    break; //breaks while loop after successful read of both sensors
   }
 
   /*
@@ -235,23 +242,27 @@ void loop() {
     digitalWrite(ledPin, LOW); //NB ESP LED pin is active low
     Serial.printf("*** Notify: %d ***\n", value);
 
-    char cTimeStr[30]; //dummy timeStamp
+    char cTimeStr[30];
     sprintf(cTimeStr, "%d-%s-%d %d:%d:%d", 29, "May", 2019, 12, 00, 00); // Format time for suitable use in thingSpeak MATLAB visualisation (ISO 8601) http://www.cplusplus.com/reference/ctime/strftime/ . dummy timeStamp. To update with RTC measurement
     dateTimeCharacteristic.setValue(cTimeStr);
     dateTimeCharacteristic.notify();
-    char cVolt[10]; //rectifier voltage
+
+    char cVolt[10];
     sprintf(cVolt, "%0.2f", actualVoltageRectifier);
     voltageCharacteristic.setValue(cVolt);
     voltageCharacteristic.notify();
+
     char cState[10];
     sprintf(cState, "%d", deviceCharged);
     batteryLevelStateCharacteristic.setValue(cState);
     batteryLevelStateCharacteristic.notify();
+
     //  Remove comment to output in CSV format
     timer = millis();
     Serial.printf("%d,%f,%f,%f,%f\n", timer, actualVoltageRectifier, loadVoltageCapacitor, currentCapacitor_mA, powerCapacitor_mW);
+
     // Serial print transmitted values
-    Serial.printf("    Values: %s %0.2f %d\n", cTimeStr, actualVoltageRectifier, deviceCharged);
+    Serial.printf("    Values: %s, %d, %0.2f, %d\n", cTimeStr, deviceID, actualVoltageRectifier, deviceCharged);
     display.drawString(0, 20, "Data Sent!");
     display.display();
     value++;

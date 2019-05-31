@@ -48,9 +48,8 @@ byte checkI2C (byte &address) {
   Wire.beginTransmission(address); // checks I2C connection is available
   error = Wire.endTransmission(); //If is available, error = 0.
   if (error > 0) {
-    // Reset I2C
-    ina219Rectifier.begin();
-    ina219_capacitor.begin();
+    display.drawString(0, 20, "I2C unavailable");
+    display.display();
   }
   return error;
 }

@@ -20,10 +20,10 @@ unsigned long timer; //Time since programme started running
 bool charged = false; //Boolean of whether the receiver has been fully charged
 
 //Initialise two instances of the INA219
-byte address_rect = 0x40;
-byte address_cap = 0x41;
-Adafruit_INA219 ina219_rectifier(address_rect);
-Adafruit_INA219 ina219_capacitor(address_cap);
+byte addressRect = 0x40;
+byte addressCap = 0x41;
+Adafruit_INA219 ina219Rectifier(addressRect);
+Adafruit_INA219 ina219Capacitor(addressCap);
 
 // Function to check availability of I2C data bus
 byte checkI2C (byte &address) {
@@ -32,8 +32,8 @@ byte checkI2C (byte &address) {
   error = Wire.endTransmission(); //If is available, error = 0.
   if (error > 0) {
     // Reset I2C
-    ina219_rectifier.begin();
-    ina219_capacitor.begin();
+    ina219Rectifier.begin();
+    ina219Capacitor.begin();
   }
   return error;
 }
@@ -46,8 +46,8 @@ void setup() {
   // Initialize the INA219.
   // By default the initialization will use the largest range (32V, 2A).  However
   // you can call a setCalibration function to change this range (see comments).
-  ina219_rectifier.begin();
-  ina219_capacitor.begin();
+  ina219Rectifier.begin();
+  ina219Capacitor.begin();
   // To use a slightly lower 32V, 1A range (higher precision on amps):
   //ina219.setCalibration_32V_1A();
   // Or to use a lower 16V, 400mA range (higher precision on volts and amps):
@@ -58,61 +58,60 @@ void setup() {
 
 void loop() {
   // Initialise rectifier sensor values
-  float shuntvoltage_rectifier = 0;
-  float busvoltage_rectifier = 0;
-  float current_mA_rectifier = 0;
-  float loadvoltage_rectifier = 0;
-  float power_mW_rectifier = 0;
-  float actualVoltage_rectifier = 0;
-  bool validRect = false; //flag to determine if data successfully read
+  float shuntVoltageRectifier = 0;
+  float busVoltageRectifier = 0;
+  float currentRectifier_mA = 0;
+  float loadVoltageRectifier = 0;
+  float powerRectifier_mW = 0;
+  float actualVoltageRectifier = 0;
 
   // Initialise capacitor sensor values
-  float shuntvoltage_capacitor = 0;
-  float busvoltage_capacitor = 0;
-  float current_mA_capacitor = 0;
-  float loadvoltage_capacitor = 0;
-  float power_mW_capacitor = 0;
-  bool validCap = false; //flag to determine if data successfully read
+  float shuntVoltageCapacitor = 0;
+  float busVoltageCapacitor = 0;
+  float currentCapacitor_mA = 0;
+  float loadVoltageCapacitor = 0;
+  float powerCapacitor_mW = 0;
 
   /*
     Now to read values from the INA219 sensors.
     If I2C unavailable due to interference, breaks the while loop to avoid process stalling.
   */
 
-  while (checkI2C (address_rect) == 0 || checkI2C (address_cap) == 0) {
+  while (checkI2C (addressRect) == 0 || checkI2C (addressCap) == 0) {
     //Rectifier sensor read. Measures voltage from the potential divider and scales it up
-    shuntvoltage_rectifier = ina219_rectifier.getShuntVoltage_mV();
-    busvoltage_rectifier = ina219_rectifier.getBusVoltage_V();
-    loadvoltage_rectifier = busvoltage_rectifier + (shuntvoltage_rectifier / 1000);
-    actualVoltage_rectifier = loadvoltage_rectifier * 4; // Potential divider ratio scaling
-    timer = millis();
-    //Serial.print("Rectifier Values:   "); Serial.print(timer); Serial.print(","); Serial.println(actualVoltage_rectifier);
+    shuntVoltageRectifier = ina219Rectifier.getShuntVoltage_mV();
+    busVoltageRectifier = ina219Rectifier.getBusVoltage_V();
+    loadVoltageRectifier = busVoltageRectifier + (shuntVoltageRectifier / 1000);
+    actualVoltageRectifier = loadVoltageRectifier * 4; // Potential divider ratio scaling
+    // timer = millis();
+    // Serial.print("Rectifier Values:   "); Serial.print(timer); Serial.print(","); Serial.println(actualVoltageRectifier);
 
     //Capacitor bank sensor read. Measures voltage and current
-    shuntvoltage_capacitor = ina219_capacitor.getShuntVoltage_mV();
-    busvoltage_capacitor = ina219_capacitor.getBusVoltage_V();
-    current_mA_capacitor = ina219_capacitor.getCurrent_mA();
-    loadvoltage_capacitor = busvoltage_capacitor + (shuntvoltage_capacitor / 1000);
-    power_mW_capacitor = loadvoltage_capacitor * current_mA_capacitor;
-    timer = millis();
-    //Serial.print("Capacitor Values:   "); Serial.print(timer); Serial.print(","); Serial.print(loadvoltage_capacitor); Serial.print(","); Serial.print(power_mW_capacitor); Serial.print(","); Serial.println(current_mA_capacitor);
+    shuntVoltageCapacitor = ina219Capacitor.getShuntVoltage_mV();
+    busVoltageCapacitor = ina219Capacitor.getBusVoltage_V();
+    currentCapacitor_mA = ina219Capacitor.getCurrent_mA();
+    loadVoltageCapacitor = busVoltageCapacitor + (shuntVoltageCapacitor / 1000);
+    powerCapacitor_mW = loadVoltageCapacitor * currentCapacitor_mA;
+    // timer = millis();
+    // Serial.print("Capacitor Values:   "); Serial.print(timer); Serial.print(","); Serial.print(loadVoltageCapacitor); Serial.print(","); Serial.print(powerCapacitor_mW); Serial.print(","); Serial.println(currentCapacitor_mA);
 
-    //  Serial.print("Bus Voltage:   "); Serial.print(busvoltage_rectifier); Serial.println(" V");
-    //  Serial.print("Shunt Voltage: "); Serial.print(shuntvoltage_rectifier); Serial.println(" mV");
-    //  Serial.print("Load Voltage:  "); Serial.print(loadvoltage_rectifier); Serial.println(" V");
-    //  Serial.print("Current:       "); Serial.print(current_mA_rectifier); Serial.println(" mA");
-    //  Serial.print("Power:         "); Serial.print(power_mW_rectifier); Serial.println(" mW");
+    //  Serial.print("Bus Voltage:   "); Serial.print(busVoltageRectifier); Serial.println(" V");
+    //  Serial.print("Shunt Voltage: "); Serial.print(shuntVoltageRectifier); Serial.println(" mV");
+    //  Serial.print("Load Voltage:  "); Serial.print(loadVoltageRectifier); Serial.println(" V");
+    //  Serial.print("Current:       "); Serial.print(currentRectifier_mA); Serial.println(" mA");
+    //  Serial.print("Power:         "); Serial.print(powerRectifier_mW); Serial.println(" mW");
     //  Serial.println("");
 
     // If capacitor voltage exceeds threshold, consider receiver charged
-    if (loadvoltage_capacitor > chargeThreshold) {
+    if (loadVoltageCapacitor > chargeThreshold) {
       charged = true;
     }
 
-    //Remove comments to output in CSV format to serial. Only prints if both measurements are successful
-    if (actualVoltage_rectifier < 31 && loadvoltage_capacitor < 31) {
+    // If both measurements are successful, values are < 31, otherwise error in I2C
+    if (actualVoltageRectifier < 31 && loadVoltageCapacitor < 31) {
+      // Remove comment to output in CSV format
       timer = millis();
-      Serial.print(timer); Serial.print(","); Serial.print(actualVoltage_rectifier); Serial.print(","); Serial.print(loadvoltage_capacitor); Serial.print(","); Serial.print(current_mA_capacitor); Serial.print(","); Serial.println(power_mW_capacitor); // }
+      Serial.printf("%d,%f,%f,%f,%f\n", timer, actualVoltageRectifier, loadVoltageCapacitor, currentCapacitor_mA, powerCapacitor_mW);
     }
     break;
   }
