@@ -1,6 +1,7 @@
 /*
     Author: Jerome Hallett
-    Board: Arduino Uno or ESP32
+    Board: ESP32
+    For OLED screen functionality, import files into same directory: fonts.h, images.h
     Code's purpose is to read sensor values from the INA219 in the receiver, checking I2C connection available to avoid process stalling.
     Measures the rectifier voltage, current, and state of charge of the receiver.
 
@@ -69,7 +70,7 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Hello!");
   uint32_t currentFrequency;
-  Wire.begin(21, 22);
+  Wire.begin(5, 4);
 
   // Initialize the INA219.
   // By default the initialization will use the largest range (32V, 2A).  However
@@ -147,4 +148,5 @@ void loop() {
   delay(500);
 }
 
+//EOF
 

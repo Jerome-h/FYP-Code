@@ -1,6 +1,7 @@
 /*
     Author: Jerome Hallett
     Board: ESP32
+    For OLED screen functionality, import files into same directory: fonts.h, images.h
     Setup a BLE server
     Also displays information through the ESP32's OLED screen. Requires files: fonts.h, images.h
 
@@ -106,3 +107,5 @@ void loop() {
   delay(2000);
   display.clear();
 }
+
+//EOF

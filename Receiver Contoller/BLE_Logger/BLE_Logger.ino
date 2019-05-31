@@ -77,12 +77,13 @@ BLEDescriptor voltageMeasurement(BLEUUID((uint16_t)0x2901));
 BLEDescriptor batteryLevelStateMeasurement(BLEUUID((uint16_t)0x2901));
 
 BLECharacteristic dateTimeCharacteristic(BLEUUID((uint16_t)0x2A0A),  // standard 16-bit characteristic UUID
-    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 BLECharacteristic voltageCharacteristic(BLEUUID((uint16_t)0x2B18),  // standard 16-bit characteristic UUID
-                                        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 BLECharacteristic batteryLevelStateCharacteristic(BLEUUID((uint16_t)0x2A1B),  // standard 16-bit characteristic UUID
-    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 
+//Manages connection state of the server
 class MyServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
       deviceConnected = true;
@@ -257,7 +258,7 @@ void loop() {
     batteryLevelStateCharacteristic.setValue(cState);
     batteryLevelStateCharacteristic.notify();
 
-    //  Remove comment to output in CSV format
+    // Remove comment to output in CSV format
     timer = millis();
     Serial.printf("%d,%f,%f,%f,%f\n", timer, actualVoltageRectifier, loadVoltageCapacitor, currentCapacitor_mA, powerCapacitor_mW);
 
@@ -268,7 +269,9 @@ void loop() {
     value++;
   }
 
-  digitalWrite(ledPin, HIGH); //NB ESP LED pin is active low
+  digitalWrite(ledPin, HIGH); // NB ESP LED pin is active low
   delay(1500);
   display.clear();
 }
+
+//EOF
