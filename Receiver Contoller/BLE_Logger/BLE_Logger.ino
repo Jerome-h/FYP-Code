@@ -182,17 +182,17 @@ void loop() {
   // Initialise rectifier sensor values
   float shuntVoltageRectifier = 0;
   float busVoltageRectifier = 0;
-  float currentRectifier_mA = 0;
+//  float currentRectifier_mA = 0;
   float loadVoltageRectifier = 0;
-  float powerRectifier_mW = 0;
+//  float powerRectifier_mW = 0;
   float actualVoltageRectifier = 0;
 
   // Initialise capacitor sensor values
   float shuntVoltageCapacitor = 0;
   float busVoltageCapacitor = 0;
-  float currentCapacitor_mA = 0;
+//  float currentCapacitor_mA = 0;
   float loadVoltageCapacitor = 0;
-  float powerCapacitor_mW = 0;
+//  float powerCapacitor_mW = 0;
 
   bool validRead = false; //flag to determine if data successfully read
 
@@ -212,9 +212,9 @@ void loop() {
     //Capacitor bank sensor read. Measures voltage and current
     shuntVoltageCapacitor = ina219Capacitor.getShuntVoltage_mV();
     busVoltageCapacitor = ina219Capacitor.getBusVoltage_V();
-    currentCapacitor_mA = ina219Capacitor.getCurrent_mA();
+//    currentCapacitor_mA = ina219Capacitor.getCurrent_mA();
     loadVoltageCapacitor = busVoltageCapacitor + (shuntVoltageCapacitor / 1000);
-    powerCapacitor_mW = loadVoltageCapacitor * currentCapacitor_mA;
+//    powerCapacitor_mW = loadVoltageCapacitor * currentCapacitor_mA;
     // timer = millis();
     // Serial.print("Capacitor Values:   "); Serial.print(timer); Serial.print(","); Serial.print(loadVoltageCapacitor); Serial.print(","); Serial.print(powerCapacitor_mW); Serial.print(","); Serial.println(currentCapacitor_mA);
 
@@ -244,7 +244,7 @@ void loop() {
     Serial.printf("*** Notify: %d ***\n", value);
 
     char cTimeStr[30];
-    sprintf(cTimeStr, "%d-%s-%d %d:%d:%d", 29, "May", 2019, 12, 00, 00); // Format time for suitable use in thingSpeak MATLAB visualisation (ISO 8601) http://www.cplusplus.com/reference/ctime/strftime/ . dummy timeStamp. To update with RTC measurement
+    sprintf(cTimeStr, "%s-%s-%s %s:%s:%s", "29", "May", "2019", "12", "00", "00"); // Format time for suitable use in thingSpeak MATLAB visualisation (ISO 8601) http://www.cplusplus.com/reference/ctime/strftime/ . dummy timeStamp. To update with RTC measurement
     dateTimeCharacteristic.setValue(cTimeStr);
     dateTimeCharacteristic.notify();
 
@@ -259,8 +259,8 @@ void loop() {
     batteryLevelStateCharacteristic.notify();
 
     // Remove comment to output in CSV format
-    timer = millis();
-    Serial.printf("%d,%f,%f,%f,%f\n", timer, actualVoltageRectifier, loadVoltageCapacitor, currentCapacitor_mA, powerCapacitor_mW);
+//    timer = millis();
+//    Serial.printf("%d,%f,%f,%f,%f\n", timer, actualVoltageRectifier, loadVoltageCapacitor, currentCapacitor_mA, powerCapacitor_mW);
 
     // Serial print transmitted values
     Serial.printf("    Values: %s, %d, %0.2f, %d\n", cTimeStr, deviceID, actualVoltageRectifier, deviceCharged);
@@ -270,7 +270,7 @@ void loop() {
   }
 
   digitalWrite(ledPin, HIGH); // NB ESP LED pin is active low
-  delay(1500);
+  delay(500);
   display.clear();
 }
 
