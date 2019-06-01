@@ -1,28 +1,25 @@
-% Template MATLAB code for visualizing data using the YYAXIS and PLOT functions.
+% Author: Jerome Hallett
+% Adapted from template MATLAB code for visualizing data using the YYAXIS and PLOT functions.
 
 % Prior to running this MATLAB code template, assign the channel ID to read
 % data from to the 'readChannelID' variable. Also, assign the field IDs
 % within the channel that you want to read data from to 'fieldID1', and
 % 'fieldID2'.
 
-% TODO - Replace the [] with channel ID to read data from:
+% Channel ID to read data from:
 readChannelID = [785277];
-% TODO - Replace the [] with the Field ID to read data from:
+% Field IDs to read data from:
 fieldID1 = [1];
-% TODO - Replace the [] with the Field ID to read data from:
 fieldID2 = [2];
-% TODO - Replace the [] with the Field ID to read data from:
 fieldID3 = [3];
 fieldID4 = [4];
 
 % Channel Read API Key 
-% If your channel is private, then enter the read API
-% Key between the '' below: 
 readAPIKey = '9NF50FOSF8G6KKKW';
 
 %% Read Data %%
 %Number of desired samples to plot
-samples = 5;
+samples = 30;
 
 % Read time variable
 [timedata] = thingSpeakRead(readChannelID,'OutputFormat','table', 'Field', fieldID1, 'NumPoints', samples, 'ReadKey', readAPIKey);
@@ -57,4 +54,5 @@ ylabel ('Current (mA)');
 ylim([0 3000])
 plot(time, data3, 'r');
 
+%datetick('x', 'dd-mmm-yyyy HH:MM:SS')
 legend({'VRect','VCap', 'Current'}, 'Location' , 'northwest');
