@@ -1,9 +1,10 @@
+%Author: Jerome Hallett
 %Checks period of time between now and last time of charge for each device. If this exceeds 
 %a user specified threshold, then it will send a command to TalkBack app, using the ID as the command
 
 %User Specified Values
 devices = 1; % Number of devices in the network
-threshold = hours(4); %User specified threshold before device requires recharging (hours)
+threshold = hours(4); %Threshold before device requires recharging (hours)
 samples = 10; %Number of samples code checks
 
 % TalkBack App setup
@@ -14,14 +15,14 @@ TalkBack_apikey = '94TNPBP06I9IKFXX';
 fieldID1 = [1];
 fieldID2 = [2];
 
-% TODO - Replace the [] with channel ID to read data from:
+%Channel ID to read data from:
 readChannelID = [786238];
-% TODO - Enter the Read API Key between the '' below:
+%Channel Read API Key:
 readAPIKey = 'P5M089D9VZBO8CI2';
 
-% TODO - Replace the [] with channel ID to write data to:
+%Channel ID to write data to:
 writeChannelID = [786238];
-% TODO - Enter the Write API Key between the '' below:
+%Channel write API Key:
 writeAPIKey = 'WNDHKD0FYTLX4GCU';
 
 % Read time data
