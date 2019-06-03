@@ -6,6 +6,6 @@ Repository contains all code relating to the network managemnet, grouped by lang
 
 - Receiver Controller: contains receiver controlling code and BLE server setup
 
-- thingSpeak: contains the MATLAB visualisation and analysis code employed on the thingSpeak channels.
+- thingSpeak: contains the MATLAB visualisation and analysis code employed on the thingSpeak channels. Check out the dashboard here: https://thingspeak.com/channels/793591
 
 
