@@ -61,24 +61,29 @@ bool deviceConnected = false;
 uint8_t value = 0;
 
 /*
-  Device to transmit device timestamp, ID (Name of device), rectifier voltage and state of battery charge.
+  Device to transmit device timestamp, ID (Name of device), rectifier voltage, power out, and state of battery charge.
   GATT Characteristics
 */
 // https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Gatt/Xml/Characteristics/org.bluetooth.characteristic.day_date_time.xml
 // https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Specifications/Mesh/Xml/Characteristics/org.bluetooth.characteristic.voltage.xml
+// https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Specifications/Mesh/Xml/Characteristics/org.bluetooth.characteristic.power.xml
 // https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Gatt/Xml/Characteristics/org.bluetooth.characteristic.battery_level_state.xml
 
 BLEDescriptor dateTimeDescriptor(BLEUUID((uint16_t)0x290C));
 BLEDescriptor voltageDescriptor(BLEUUID((uint16_t)0x290C));
+BLEDescriptor powerDescriptor(BLEUUID((uint16_t)0x290C));
 BLEDescriptor batteryLevelStateDescriptor(BLEUUID((uint16_t)0x290C));
 
 BLEDescriptor dateTimeMeasurement(BLEUUID((uint16_t)0x2901));
 BLEDescriptor voltageMeasurement(BLEUUID((uint16_t)0x2901));
+BLEDescriptor powerMeasurement(BLEUUID((uint16_t)0x2901));
 BLEDescriptor batteryLevelStateMeasurement(BLEUUID((uint16_t)0x2901));
 
 BLECharacteristic dateTimeCharacteristic(BLEUUID((uint16_t)0x2A0A),  // standard 16-bit characteristic UUID
 BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 BLECharacteristic voltageCharacteristic(BLEUUID((uint16_t)0x2B18),  // standard 16-bit characteristic UUID
+BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+BLECharacteristic powerCharacteristic(BLEUUID((uint16_t)0x2B05),  // standard 16-bit characteristic UUID
 BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 BLECharacteristic batteryLevelStateCharacteristic(BLEUUID((uint16_t)0x2A1B),  // standard 16-bit characteristic UUID
 BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
@@ -110,6 +115,7 @@ void InitBLE() {
   // Add Charcteristics
   pService->addCharacteristic(&dateTimeCharacteristic);
   pService->addCharacteristic(&voltageCharacteristic);
+  pService->addCharacteristic(&powerCharacteristic);
   pService->addCharacteristic(&batteryLevelStateCharacteristic);
   Serial.println("Added characteristics");
 
@@ -117,11 +123,14 @@ void InitBLE() {
   dateTimeCharacteristic.addDescriptor(&dateTimeDescriptor);
   voltageDescriptor.setValue("Voltage eg 10");
   voltageCharacteristic.addDescriptor(&voltageDescriptor);
+  powerDescriptor.setValue("Power (W) eg 1");
+  voltageCharacteristic.addDescriptor(&voltageDescriptor);
   batteryLevelStateDescriptor.setValue("Battery Level State eg 1");
   batteryLevelStateCharacteristic.addDescriptor(&batteryLevelStateDescriptor);
   Serial.println("Added descriptors");
   dateTimeCharacteristic.addDescriptor(new BLE2902());
   voltageCharacteristic.addDescriptor(new BLE2902());
+  powerCharacteristic.addDescriptor(new BLE2902());
   batteryLevelStateCharacteristic.addDescriptor(new BLE2902());
   Serial.println("Added 2902");
 
@@ -190,9 +199,9 @@ void loop() {
   // Initialise capacitor sensor values
   float shuntVoltageCapacitor = 0;
   float busVoltageCapacitor = 0;
-//  float currentCapacitor_mA = 0;
+  float currentCapacitor_mA = 0;
   float loadVoltageCapacitor = 0;
-//  float powerCapacitor_mW = 0;
+  float powerCapacitor_W = 0;
 
   bool validRead = false; //flag to determine if data successfully read
 
@@ -212,11 +221,11 @@ void loop() {
     //Capacitor bank sensor read. Measures voltage and current
     shuntVoltageCapacitor = ina219Capacitor.getShuntVoltage_mV();
     busVoltageCapacitor = ina219Capacitor.getBusVoltage_V();
-//    currentCapacitor_mA = ina219Capacitor.getCurrent_mA();
+    currentCapacitor_mA = ina219Capacitor.getCurrent_mA();
     loadVoltageCapacitor = busVoltageCapacitor + (shuntVoltageCapacitor / 1000);
-//    powerCapacitor_mW = loadVoltageCapacitor * currentCapacitor_mA;
+    powerCapacitor_W = loadVoltageCapacitor * currentCapacitor_mA * 1000;
     // timer = millis();
-    // Serial.print("Capacitor Values:   "); Serial.print(timer); Serial.print(","); Serial.print(loadVoltageCapacitor); Serial.print(","); Serial.print(powerCapacitor_mW); Serial.print(","); Serial.println(currentCapacitor_mA);
+    // Serial.print("Capacitor Values:   "); Serial.print(timer); Serial.print(","); Serial.print(loadVoltageCapacitor); Serial.print(","); Serial.print(powerCapacitor_W); Serial.print(","); Serial.println(currentCapacitor_mA);
 
     //  Serial.print("Bus Voltage:   "); Serial.print(busVoltageRectifier); Serial.println(" V");
     //  Serial.print("Shunt Voltage: "); Serial.print(shuntVoltageRectifier); Serial.println(" mV");
@@ -253,6 +262,11 @@ void loop() {
     voltageCharacteristic.setValue(cVolt);
     voltageCharacteristic.notify();
 
+    char cPower[10];
+    sprintf(cPower, "%0.2f", powerCapacitor_W);
+    powerCharacteristic.setValue(cPower);
+    powerCharacteristic.notify();
+
     char cState[10];
     sprintf(cState, "%d", deviceCharged);
     batteryLevelStateCharacteristic.setValue(cState);
@@ -260,10 +274,10 @@ void loop() {
 
     // Remove comment to output in CSV format
 //    timer = millis();
-//    Serial.printf("%d,%f,%f,%f,%f\n", timer, actualVoltageRectifier, loadVoltageCapacitor, currentCapacitor_mA, powerCapacitor_mW);
+//    Serial.printf("%d,%f,%f,%f,%f\n", timer, actualVoltageRectifier, loadVoltageCapacitor, currentCapacitor_mA, powerCapacitor_W);
 
     // Serial print transmitted values
-    Serial.printf("    Values: %s, %d, %0.2f, %d\n", cTimeStr, deviceID, actualVoltageRectifier, deviceCharged);
+    Serial.printf("    Values: %s, %d, %0.2f, %0.2f, %d\n", cTimeStr, deviceID, actualVoltageRectifier, powerCapacitor_W, deviceCharged);
     display.drawString(0, 20, "Data Sent!");
     display.display();
     value++;
