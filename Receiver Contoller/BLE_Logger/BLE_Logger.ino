@@ -1,10 +1,9 @@
 /*
     Author: Jerome Hallett
     Board: ESP32
-    For OLED screen functionality, import files into same directory: fonts.h, images.h
     Code's purpose is to read sensor values from the INA219 in the receiver, checking I2C connection available to avoid process stalling.
-    Then broadcasts data via a BLE server. Data broadcasted is the rectifier voltage, current, and state of charge of the receiver.
-    Also displays information through the ESP32's OLED screen.
+    Uses a Real Time Clock (RTC) to record timestamp.
+    Then broadcasts data via a BLE server. Data broadcasted is the timestamp, rectifier voltage, power out, and state of charge of the receiver.
 
     INA219 sensor code:
     Based from https://learn.adafruit.com/adafruit-ina219-current-sensor-breakout/arduino-code
@@ -20,41 +19,34 @@
 //INA219 sensor & I2C
 #include <Wire.h>
 #include <Adafruit_INA219.h>
+//Real Time Clock
+#include "RTClib.h"
+#include <Time.h>
 //BLE
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
 #include <BLE2902.h>
-//EPS32 OLED Screen
-#include <OLEDDisplayFonts.h>
-#include <OLEDDisplay.h>
-#include <OLEDDisplayUi.h>
-#include <SSD1306Wire.h>
-#include <SSD1306.h>
-#include "images.h"
-#include "fonts.h"
-#include <string.h>
 
 //User specfied inputs
 uint8_t deviceID = 1; //ID of receiver device. Will become the name of the server
 uint8_t chargeThreshold = 14.5; //Threshold of capacitor voltage to consider receiver as deviceCharged
+uint8_t SDApin = 21; //SDA pin (Blue Cable)
+uint8_t SCLpin = 22; //SCL pin (White Cable)
 
 //Device setup
 unsigned long timer; //Time since programme started running
 uint8_t deviceCharged = 0; //Boolean of whether the receiver has been fully deviceCharged
 uint8_t ledPin = 16; //Onboard LED reference
 
-// The built-in OLED is a 128*64 mono pixel display
-// i2c address = 0x3c
-// SDA = 5
-// SCL = 4
-SSD1306 display(0x3c, 5, 4);
-
 //Initialise two instances of the INA219
 byte addressRect = 0x40;
 byte addressCap = 0x41;
 Adafruit_INA219 ina219Rectifier(addressRect);
 Adafruit_INA219 ina219Capacitor(addressCap);
+
+//Real Time Clock instance initialisation. https://learn.adafruit.com/ds1307-real-time-clock-breakout-board-kit/what-is-an-rtc
+RTC_DS1307 RTC;
 
 //BLE setup
 bool deviceConnected = false;
@@ -80,13 +72,13 @@ BLEDescriptor powerMeasurement(BLEUUID((uint16_t)0x2901));
 BLEDescriptor batteryLevelStateMeasurement(BLEUUID((uint16_t)0x2901));
 
 BLECharacteristic dateTimeCharacteristic(BLEUUID((uint16_t)0x2A0A),  // standard 16-bit characteristic UUID
-BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 BLECharacteristic voltageCharacteristic(BLEUUID((uint16_t)0x2B18),  // standard 16-bit characteristic UUID
-BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+                                        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 BLECharacteristic powerCharacteristic(BLEUUID((uint16_t)0x2B05),  // standard 16-bit characteristic UUID
-BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+                                      BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 BLECharacteristic batteryLevelStateCharacteristic(BLEUUID((uint16_t)0x2A1B),  // standard 16-bit characteristic UUID
-BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 
 //Manages connection state of the server
 class MyServerCallbacks: public BLEServerCallbacks {
@@ -146,25 +138,11 @@ byte checkI2C (byte &address) {
   byte error;
   Wire.beginTransmission(address); // checks I2C connection is available
   error = Wire.endTransmission(); //If is available, error = 0.
-  if (error > 0) {
-    display.drawString(0, 20, "I2C unavailable");
-    display.display();
-  }
   return error;
 }
 
 void setup() {
   pinMode(ledPin, OUTPUT); // Onboard LED reference
-
-  // Initialize the OLED display
-  display.init();
-  display.flipScreenVertically();
-  display.setFont(Roboto_Medium_14);
-  display.drawString(0, 0, "BLE Server");
-  display.display();
-  digitalWrite(ledPin, LOW); //NB ESP LED pin is active low
-  delay(1500);
-  display.clear();
 
   Serial.begin(115200);
   Serial.println("Starting BLE");
@@ -172,10 +150,20 @@ void setup() {
   // Create the BLE Device
   InitBLE();
   Serial.println("Waiting for a client connection to notify...");
+  
+  uint32_t currentFrequency;
+  Wire.begin(SDApin, SCLpin);
+  
+  //Initialise Real Time Clock
+  RTC.begin();
+  if (! RTC.isrunning()) {
+    Serial.println("RTC is NOT running!");
+    // following line sets the RTC to the date & time this sketch was compiled
+    RTC.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  }
 
   // Initialize the INA219.
-  uint32_t currentFrequency;
-  Wire.begin(5, 4);
+
   // By default the initialization will use the largest range (32V, 2A).  However
   // you can call a setCalibration function to change this range (see comments).
   ina219Rectifier.begin();
@@ -191,9 +179,9 @@ void loop() {
   // Initialise rectifier sensor values
   float shuntVoltageRectifier = 0;
   float busVoltageRectifier = 0;
-//  float currentRectifier_mA = 0;
+  //  float currentRectifier_mA = 0;
   float loadVoltageRectifier = 0;
-//  float powerRectifier_mW = 0;
+  //  float powerRectifier_mW = 0;
   float actualVoltageRectifier = 0;
 
   // Initialise capacitor sensor values
@@ -223,7 +211,7 @@ void loop() {
     busVoltageCapacitor = ina219Capacitor.getBusVoltage_V();
     currentCapacitor_mA = ina219Capacitor.getCurrent_mA();
     loadVoltageCapacitor = busVoltageCapacitor + (shuntVoltageCapacitor / 1000);
-    powerCapacitor_W = loadVoltageCapacitor * currentCapacitor_mA * 1000;
+    powerCapacitor_W = (loadVoltageCapacitor * currentCapacitor_mA) / 1000;
     // timer = millis();
     // Serial.print("Capacitor Values:   "); Serial.print(timer); Serial.print(","); Serial.print(loadVoltageCapacitor); Serial.print(","); Serial.print(powerCapacitor_W); Serial.print(","); Serial.println(currentCapacitor_mA);
 
@@ -252,8 +240,9 @@ void loop() {
     digitalWrite(ledPin, LOW); //NB ESP LED pin is active low
     Serial.printf("*** Notify: %d ***\n", value);
 
+    DateTime now = RTC.now();
     char cTimeStr[30];
-    sprintf(cTimeStr, "%s-%s-%s %s:%s:%s", "29", "May", "2019", "12", "00", "00"); // Format time for suitable use in thingSpeak MATLAB visualisation (ISO 8601) http://www.cplusplus.com/reference/ctime/strftime/ . dummy timeStamp. To update with RTC measurement
+    sprintf(cTimeStr, "%d-%d-%d %d:%d:%d", now.day(), now.month(), now.year(), now.hour(), now.minute(), now.second()); // Format time for suitable use in thingSpeak MATLAB visualisation (ISO 8601) http://www.cplusplus.com/reference/ctime/strftime/ .
     dateTimeCharacteristic.setValue(cTimeStr);
     dateTimeCharacteristic.notify();
 
@@ -273,19 +262,16 @@ void loop() {
     batteryLevelStateCharacteristic.notify();
 
     // Remove comment to output in CSV format
-//    timer = millis();
-//    Serial.printf("%d,%f,%f,%f,%f\n", timer, actualVoltageRectifier, loadVoltageCapacitor, currentCapacitor_mA, powerCapacitor_W);
+    //    timer = millis();
+    //    Serial.printf("%d,%f,%f,%f,%f\n", timer, actualVoltageRectifier, loadVoltageCapacitor, currentCapacitor_mA, powerCapacitor_W);
 
     // Serial print transmitted values
     Serial.printf("    Values: %s, %d, %0.2f, %0.2f, %d\n", cTimeStr, deviceID, actualVoltageRectifier, powerCapacitor_W, deviceCharged);
-    display.drawString(0, 20, "Data Sent!");
-    display.display();
     value++;
   }
 
   digitalWrite(ledPin, HIGH); // NB ESP LED pin is active low
-  delay(500);
-  display.clear();
+  delay(1000);
 }
 
 //EOF

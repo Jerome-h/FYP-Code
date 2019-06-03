@@ -13,15 +13,6 @@
 //Import required libraries for INA219 sensor & I2C
 #include <Wire.h>
 #include <Adafruit_INA219.h>
-////EPS32 OLED Screen
-#include <OLEDDisplayFonts.h>
-#include <OLEDDisplay.h>
-#include <OLEDDisplayUi.h>
-#include <SSD1306Wire.h>
-#include <SSD1306.h>
-#include "images.h"
-#include "fonts.h"
-#include <string.h>
 
 //User specfied inputs
 uint8_t chargeThreshold = 14.5; //Threshold of capacitor voltage to consider receiver as charged
@@ -37,40 +28,21 @@ byte addressCap = 0x41;
 Adafruit_INA219 ina219Rectifier(addressRect);
 Adafruit_INA219 ina219_capacitor(addressCap);
 
-// The built-in OLED is a 128*64 mono pixel display
-// i2c address = 0x3c
-// SDA = 5
-// SCL = 4
-SSD1306 display(0x3c, 5, 4);
-
 // Function to check availability of I2C data bus
 byte checkI2C (byte &address) {
   byte error;
   Wire.beginTransmission(address); // checks I2C connection is available
   error = Wire.endTransmission(); //If is available, error = 0.
-  if (error > 0) {
-    display.drawString(0, 20, "I2C unavailable");
-    display.display();
-  }
+  Serial.println(error);
   return error;
 }
 
 void setup() {
   pinMode(ledPin, OUTPUT); // Onboard LED reference
-  //   Initialize the OLED display
-  display.init();
-  display.flipScreenVertically();
-  display.setFont(Roboto_Medium_14);
-  display.drawString(0, 0, "Data Logger");
-  display.display();
-  digitalWrite(ledPin, LOW); //NB LED pin is active low
-  delay(1500);
-  display.clear();
-
   Serial.begin(115200);
   Serial.println("Hello!");
   uint32_t currentFrequency;
-  Wire.begin(5, 4);
+  Wire.begin(21, 22);
 
   // Initialize the INA219.
   // By default the initialization will use the largest range (32V, 2A).  However
