@@ -30,7 +30,7 @@
 
 //User specfied inputs
 uint8_t deviceID = 1; //ID of receiver device. Will become the name of the server
-uint8_t chargeThreshold = 14.5; //Threshold of capacitor voltage to consider receiver as deviceCharged
+uint8_t chargeThreshold = 14; //Threshold of capacitor bank voltage to consider receiver as deviceCharged
 uint8_t SDApin = 21; //SDA pin (Blue Cable)
 uint8_t SCLpin = 22; //SCL pin (White Cable)
 
@@ -150,10 +150,10 @@ void setup() {
   // Create the BLE Device
   InitBLE();
   Serial.println("Waiting for a client connection to notify...");
-  
+
   uint32_t currentFrequency;
   Wire.begin(SDApin, SCLpin);
-  
+
   //Initialise Real Time Clock
   RTC.begin();
   if (! RTC.isrunning()) {
@@ -234,9 +234,9 @@ void loop() {
   }
 
   /*
-    BLE server update of new valid measurements and state of charge
+    BLE server update of new valid measurements and state of charge. Only updates if device is connected, there has been a valid read, and the RTC is running
   */
-  if (deviceConnected && validRead == true) {
+  if (deviceConnected && validRead == true && RTC.isrunning()) {
     digitalWrite(ledPin, LOW); //NB ESP LED pin is active low
     Serial.printf("*** Notify: %d ***\n", value);
 
@@ -268,6 +268,20 @@ void loop() {
     // Serial print transmitted values
     Serial.printf("    Values: %s, %d, %0.2f, %0.2f, %d\n", cTimeStr, deviceID, actualVoltageRectifier, powerCapacitor_W, deviceCharged);
     value++;
+  }
+  else if (deviceConnected && validRead == false) {
+    //reset characteristics if invalid read
+    dateTimeCharacteristic.setValue("");
+    dateTimeCharacteristic.notify();
+
+    voltageCharacteristic.setValue("");
+    voltageCharacteristic.notify();
+
+    powerCharacteristic.setValue("");
+    powerCharacteristic.notify();
+
+    batteryLevelStateCharacteristic.setValue("");
+    batteryLevelStateCharacteristic.notify();
   }
 
   digitalWrite(ledPin, HIGH); // NB ESP LED pin is active low
