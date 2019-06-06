@@ -29,7 +29,7 @@
 #include <BLE2902.h>
 
 //User specfied inputs
-uint8_t deviceID = 1; //ID of receiver device. Will become the name of the server
+uint8_t deviceID = 2; //ID of receiver device. Will become the name of the server
 uint8_t chargeThreshold = 14; //Threshold of capacitor bank voltage to consider receiver as deviceCharged
 uint8_t SDApin = 21; //SDA pin (Blue Cable)
 uint8_t SCLpin = 22; //SCL pin (White Cable)
@@ -46,7 +46,7 @@ Adafruit_INA219 ina219Rectifier(addressRect);
 Adafruit_INA219 ina219Capacitor(addressCap);
 
 //Real Time Clock instance initialisation. https://learn.adafruit.com/ds1307-real-time-clock-breakout-board-kit/what-is-an-rtc
-RTC_DS1307 RTC;
+//RTC_DS1307 RTC;
 
 //BLE setup
 bool deviceConnected = false;
@@ -72,13 +72,13 @@ BLEDescriptor powerMeasurement(BLEUUID((uint16_t)0x2901));
 BLEDescriptor batteryLevelStateMeasurement(BLEUUID((uint16_t)0x2901));
 
 BLECharacteristic dateTimeCharacteristic(BLEUUID((uint16_t)0x2A0A),  // standard 16-bit characteristic UUID
-    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 BLECharacteristic voltageCharacteristic(BLEUUID((uint16_t)0x2B18),  // standard 16-bit characteristic UUID
-                                        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 BLECharacteristic powerCharacteristic(BLEUUID((uint16_t)0x2B05),  // standard 16-bit characteristic UUID
-                                      BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 BLECharacteristic batteryLevelStateCharacteristic(BLEUUID((uint16_t)0x2A1B),  // standard 16-bit characteristic UUID
-    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 
 //Manages connection state of the server
 class MyServerCallbacks: public BLEServerCallbacks {
@@ -155,12 +155,12 @@ void setup() {
   Wire.begin(SDApin, SCLpin);
 
   //Initialise Real Time Clock
-  RTC.begin();
-  if (! RTC.isrunning()) {
-    Serial.println("RTC is NOT running!");
-    // following line sets the RTC to the date & time this sketch was compiled
-    RTC.adjust(DateTime(F(__DATE__), F(__TIME__)));
-  }
+  //  RTC.begin();
+  //  if (! RTC.isrunning()) {
+  //    Serial.println("RTC is NOT running!");
+  //    // following line sets the RTC to the date & time this sketch was compiled
+  //    RTC.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  //  }
 
   // Initialize the INA219.
 
@@ -234,17 +234,18 @@ void loop() {
   }
 
   /*
-    BLE server update of new valid measurements and state of charge. Only updates if device is connected, there has been a valid read, and the RTC is running
+    BLE server update of new valid measurements and state of charge. Only updates if device is connected, there has been a valid read
+
   */
-  if (deviceConnected && validRead == true && RTC.isrunning()) {
+  if (deviceConnected && validRead == true) {
     digitalWrite(ledPin, LOW); //NB ESP LED pin is active low
     Serial.printf("*** Notify: %d ***\n", value);
 
-    DateTime now = RTC.now();
-    char cTimeStr[30];
-    sprintf(cTimeStr, "%d-%d-%d %d:%d:%d", now.day(), now.month(), now.year(), now.hour(), now.minute(), now.second()); // Format time for suitable use in thingSpeak MATLAB visualisation (ISO 8601) http://www.cplusplus.com/reference/ctime/strftime/ .
-    dateTimeCharacteristic.setValue(cTimeStr);
-    dateTimeCharacteristic.notify();
+    //    DateTime now = RTC.now();
+    //    char cTimeStr[30];
+    //    sprintf(cTimeStr, "%d-%d-%d %d:%d:%d", now.day(), now.month(), now.year(), now.hour(), now.minute(), now.second()); // Format time for suitable use in thingSpeak MATLAB visualisation (ISO 8601) http://www.cplusplus.com/reference/ctime/strftime/ .
+    //    dateTimeCharacteristic.setValue(cTimeStr);
+    //    dateTimeCharacteristic.notify();
 
     char cVolt[10];
     sprintf(cVolt, "%0.2f", actualVoltageRectifier);
@@ -266,7 +267,7 @@ void loop() {
     //    Serial.printf("%d,%f,%f,%f,%f\n", timer, actualVoltageRectifier, loadVoltageCapacitor, currentCapacitor_mA, powerCapacitor_W);
 
     // Serial print transmitted values
-    Serial.printf("    Values: %s, %d, %0.2f, %0.2f, %d\n", cTimeStr, deviceID, actualVoltageRectifier, powerCapacitor_W, deviceCharged);
+    Serial.printf("    Values: %d, %0.2f, %0.2f, %d\n", deviceID, actualVoltageRectifier, powerCapacitor_W, deviceCharged);
     value++;
   }
   else if (deviceConnected && validRead == false) {
