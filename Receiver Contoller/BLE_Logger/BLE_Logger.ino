@@ -36,7 +36,7 @@ uint8_t SCLpin = 22; //SCL pin (White Cable)
 
 //Device setup
 unsigned long timer; //Time since programme started running
-uint8_t deviceCharged = 0; //Boolean of whether the receiver has been fully deviceCharged
+uint8_t deviceCharged = 0; //Boolean of whether the device has been fully charged
 uint8_t ledPin = 16; //Onboard LED reference
 
 //Initialise two instances of the INA219
