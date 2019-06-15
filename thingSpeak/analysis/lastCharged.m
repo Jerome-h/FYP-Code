@@ -77,7 +77,7 @@ for i = 1:devices
             disp('Duration for device ' + string(i) + ' exceeds threshold');
             disp("Updating TalkBack App with command to charge ID ...") ;
             %Sends a command to the TalkBack app. Command string is ID of device (Could be changed to GPS Coordinates)
-            data = webread(url,'api_key',TalkBack_apikey,'command_string',i,options)
+            data = webread(url,'api_key',TalkBack_apikey,'command_string',i,options);
           end
           %Breaks when sample's ID corresponds to the ID of the current iteration
           break;
@@ -87,7 +87,7 @@ for i = 1:devices
     %If device not in sample set, flag remains false. Needs to be scheduled for charging as last time of charging is unknown
     if deviceFlag == false
         %Sends a command to the TalkBack app. Command is ID of device
-        data = webread(url,'api_key',TalkBack_apikey,'command_string',i,options)
+        data = webread(url,'api_key',TalkBack_apikey,'command_string',i,options);
     end
 end
 
