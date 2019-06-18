@@ -29,8 +29,8 @@
 #include <BLE2902.h>
 
 //User specfied inputs
-uint8_t deviceID = 2; //ID of receiver device. Will become the name of the server
-uint8_t chargeThreshold = 14; //Threshold of capacitor bank voltage to consider receiver as deviceCharged
+uint8_t deviceID = 1; //ID of receiver device. Will become the name of the server
+uint8_t chargeThreshold = 14.5; //Threshold of capacitor bank voltage to consider receiver as deviceCharged
 uint8_t SDApin = 21; //SDA pin (Blue Cable)
 uint8_t SCLpin = 22; //SCL pin (White Cable)
 
@@ -72,13 +72,13 @@ BLEDescriptor powerMeasurement(BLEUUID((uint16_t)0x2901));
 BLEDescriptor batteryLevelStateMeasurement(BLEUUID((uint16_t)0x2901));
 
 BLECharacteristic dateTimeCharacteristic(BLEUUID((uint16_t)0x2A0A),  // standard 16-bit characteristic UUID
-BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 BLECharacteristic voltageCharacteristic(BLEUUID((uint16_t)0x2B18),  // standard 16-bit characteristic UUID
-BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+                                        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 BLECharacteristic powerCharacteristic(BLEUUID((uint16_t)0x2B05),  // standard 16-bit characteristic UUID
-BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+                                      BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 BLECharacteristic batteryLevelStateCharacteristic(BLEUUID((uint16_t)0x2A1B),  // standard 16-bit characteristic UUID
-BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 
 //Manages connection state of the server
 class MyServerCallbacks: public BLEServerCallbacks {
@@ -138,6 +138,10 @@ byte checkI2C (byte &address) {
   byte error;
   Wire.beginTransmission(address); // checks I2C connection is available
   error = Wire.endTransmission(); //If is available, error = 0.
+  if (error > 0) {
+    ina219Rectifier.begin();
+    ina219Capacitor.begin();
+  }
   return error;
 }
 
@@ -195,9 +199,9 @@ void loop() {
 
   /*
     Now to read values from the INA219 sensors.
-    If I2C unavailable due to interference, breaks the while loop to avoid process stalling.
+    If I2C unavailable due to interference, doesn't perform measurements to avoid process stalling.
   */
-  while (checkI2C (addressRect) == 0 && checkI2C (addressCap) == 0 ) {
+  if (checkI2C (addressRect) == 0 && checkI2C (addressCap) == 0 ) {
     //rectifier sensor read. Measures voltage from the potential divider and scales it up
     shuntVoltageRectifier = ina219Rectifier.getShuntVoltage_mV();
     busVoltageRectifier = ina219Rectifier.getBusVoltage_V();
@@ -210,6 +214,10 @@ void loop() {
     shuntVoltageCapacitor = ina219Capacitor.getShuntVoltage_mV();
     busVoltageCapacitor = ina219Capacitor.getBusVoltage_V();
     currentCapacitor_mA = ina219Capacitor.getCurrent_mA();
+    //Remove invalid negative readings
+    if (currentCapacitor_mA < 0){
+      currentCapacitor_mA = 0;
+    }
     loadVoltageCapacitor = busVoltageCapacitor + (shuntVoltageCapacitor / 1000);
     powerCapacitor_W = (loadVoltageCapacitor * currentCapacitor_mA) / 1000;
     // timer = millis();
@@ -223,23 +231,22 @@ void loop() {
     //  Serial.println("");
 
     //If statement to check if the sensor read was valid
-    if (actualVoltageRectifier < 31 && loadVoltageCapacitor < 31) {
+    if (actualVoltageRectifier < 31 && loadVoltageCapacitor < (chargeThreshold+2)) {
       validRead = true; //flag to determine if data successfully read
       // If capacitor voltage exceeds threshold, consider receiver deviceCharged
       if (loadVoltageCapacitor > chargeThreshold) {
         deviceCharged = 1;
       }
     }
-    break; //breaks while loop after successful read of both sensors
   }
 
   /*
-    BLE server update of new valid measurements and state of charge. Only updates if device is connected, there has been a valid read
-
+    BLE server update of new valid measurements and state of charge.
+    Only updates if device is connected, there has been a valid read
   */
   if (deviceConnected && validRead == true) {
     digitalWrite(ledPin, LOW); //NB ESP LED pin is active low
-    Serial.printf("*** Notify: %d ***\n", value);
+    //    Serial.printf("*** Notify: %d ***\n", value);
 
     //    DateTime now = RTC.now();
     //    char cTimeStr[30];
@@ -263,11 +270,11 @@ void loop() {
     batteryLevelStateCharacteristic.notify();
 
     // Remove comment to output in CSV format
-    //    timer = millis();
-    //    Serial.printf("%d,%f,%f,%f,%f\n", timer, actualVoltageRectifier, loadVoltageCapacitor, currentCapacitor_mA, powerCapacitor_W);
+        timer = millis();
+        Serial.printf("%d,%f,%f,%f,%f\n", timer, actualVoltageRectifier, loadVoltageCapacitor, currentCapacitor_mA, powerCapacitor_W);
 
     // Serial print transmitted values
-    Serial.printf("    Values: %d, %0.2f, %0.2f, %d\n", deviceID, actualVoltageRectifier, powerCapacitor_W, deviceCharged);
+    //    Serial.printf("    Values: %d, %0.2f, %0.2f, %d\n", deviceID, actualVoltageRectifier, powerCapacitor_W, deviceCharged);
     value++;
   }
   else if (deviceConnected && validRead == false) {

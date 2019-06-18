@@ -26,14 +26,17 @@ uint8_t ledPin = 16; // Onboard LED reference
 byte addressRect = 0x40;
 byte addressCap = 0x41;
 Adafruit_INA219 ina219Rectifier(addressRect);
-Adafruit_INA219 ina219_capacitor(addressCap);
+Adafruit_INA219 ina219Capacitor(addressCap);
 
 // Function to check availability of I2C data bus
 byte checkI2C (byte &address) {
   byte error;
   Wire.beginTransmission(address); // checks I2C connection is available
   error = Wire.endTransmission(); //If is available, error = 0.
-  Serial.println(error);
+  if (error > 0) {
+    ina219Rectifier.begin();
+    ina219Capacitor.begin();
+  }
   return error;
 }
 
@@ -48,7 +51,7 @@ void setup() {
   // By default the initialization will use the largest range (32V, 2A).  However
   // you can call a setCalibration function to change this range (see comments).
   ina219Rectifier.begin();
-  ina219_capacitor.begin();
+  ina219Capacitor.begin();
   // To use a slightly lower 32V, 1A range (higher precision on amps):
   //ina219.setCalibration_32V_1A();
   // Or to use a lower 16V, 400mA range (higher precision on volts and amps):
@@ -77,9 +80,9 @@ void loop() {
 
   /*
     Now to read values from the INA219 sensors.
-    If I2C unavailable due to interference, breaks the while loop to avoid process stalling.
+    If I2C unavailable due to interference, does not perform measurements to avoid process stalling.
   */
-  while (checkI2C (addressRect) == 0 && checkI2C (addressCap) == 0 ) {
+  if (checkI2C (addressRect) == 0 && checkI2C (addressCap) == 0 ) {
     //rectifier sensor read. Measures voltage from the potential divider and scales it up
     shuntVoltageRectifier = ina219Rectifier.getShuntVoltage_mV();
     busVoltageRectifier = ina219Rectifier.getBusVoltage_V();
@@ -89,9 +92,9 @@ void loop() {
     // Serial.print("Rectifier Values:   "); Serial.print(timer); Serial.print(","); Serial.println(actualVoltageRectifier);
 
     //Capacitor bank sensor read. Measures voltage and current
-    shuntVoltageCapacitor = ina219_capacitor.getShuntVoltage_mV();
-    busVoltageCapacitor = ina219_capacitor.getBusVoltage_V();
-    currentCapacitor_mA = ina219_capacitor.getCurrent_mA();
+    shuntVoltageCapacitor = ina219Capacitor.getShuntVoltage_mV();
+    busVoltageCapacitor = ina219Capacitor.getBusVoltage_V();
+    currentCapacitor_mA = ina219Capacitor.getCurrent_mA();
     loadVoltageCapacitor = busVoltageCapacitor + (shuntVoltageCapacitor / 1000);
     powerCapacitor_mW = loadVoltageCapacitor * currentCapacitor_mA;
     // timer = millis();
@@ -115,7 +118,6 @@ void loop() {
       timer = millis();
       Serial.printf("%d,%f,%f,%f,%f\n", timer, actualVoltageRectifier, loadVoltageCapacitor, currentCapacitor_mA, powerCapacitor_mW);
     }
-    break; //break while loop
   }
   delay(500);
 }
