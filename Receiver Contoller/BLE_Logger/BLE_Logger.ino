@@ -72,13 +72,13 @@ BLEDescriptor powerMeasurement(BLEUUID((uint16_t)0x2901));
 BLEDescriptor batteryLevelStateMeasurement(BLEUUID((uint16_t)0x2901));
 
 BLECharacteristic dateTimeCharacteristic(BLEUUID((uint16_t)0x2A0A),  // standard 16-bit characteristic UUID
-    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 BLECharacteristic voltageCharacteristic(BLEUUID((uint16_t)0x2B18),  // standard 16-bit characteristic UUID
-                                        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 BLECharacteristic powerCharacteristic(BLEUUID((uint16_t)0x2B05),  // standard 16-bit characteristic UUID
-                                      BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 BLECharacteristic batteryLevelStateCharacteristic(BLEUUID((uint16_t)0x2A1B),  // standard 16-bit characteristic UUID
-    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 
 //Manages connection state of the server
 class MyServerCallbacks: public BLEServerCallbacks {
@@ -215,7 +215,7 @@ void loop() {
     busVoltageCapacitor = ina219Capacitor.getBusVoltage_V();
     currentCapacitor_mA = ina219Capacitor.getCurrent_mA();
     //Remove invalid negative readings
-    if (currentCapacitor_mA < 0){
+    if (currentCapacitor_mA < 0) {
       currentCapacitor_mA = 0;
     }
     loadVoltageCapacitor = busVoltageCapacitor + (shuntVoltageCapacitor / 1000);
@@ -231,7 +231,7 @@ void loop() {
     //  Serial.println("");
 
     //If statement to check if the sensor read was valid
-    if (actualVoltageRectifier < 31 && loadVoltageCapacitor < (chargeThreshold+2)) {
+    if (actualVoltageRectifier < 31 && loadVoltageCapacitor < (chargeThreshold + 2)) {
       validRead = true; //flag to determine if data successfully read
       // If capacitor voltage exceeds threshold, consider receiver deviceCharged
       if (loadVoltageCapacitor > chargeThreshold) {
@@ -270,8 +270,8 @@ void loop() {
     batteryLevelStateCharacteristic.notify();
 
     // Remove comment to output in CSV format
-        timer = millis();
-        Serial.printf("%d,%f,%f,%f,%f\n", timer, actualVoltageRectifier, loadVoltageCapacitor, currentCapacitor_mA, powerCapacitor_W);
+    timer = millis();
+    Serial.printf("%d,%f,%f,%f,%f\n", timer, actualVoltageRectifier, loadVoltageCapacitor, currentCapacitor_mA, powerCapacitor_W);
 
     // Serial print transmitted values
     //    Serial.printf("    Values: %d, %0.2f, %0.2f, %d\n", deviceID, actualVoltageRectifier, powerCapacitor_W, deviceCharged);
